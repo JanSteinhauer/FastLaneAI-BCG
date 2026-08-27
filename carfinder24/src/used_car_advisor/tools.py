@@ -565,7 +565,19 @@ async def summarize_choices(
     result = await _call(context, "decision_summary", consultation.as_kwargs())
     if isinstance(result, str):
         return result
-    await ui.push(context, ui.summary_payload(result))
+    # The reasons are spoken, not printed. Read as text they are a wall of
+    # eight "why this car" lines restating what the customer just said, and
+    # pushing them replaces the card — the one thing on screen they are
+    # actually deciding from. So the summary goes to the model to say out
+    # loud, and the screen keeps showing the car.
+    if ref:
+        await _push_one_car(
+            context,
+            ref,
+            consultation.term_months or 36,
+            consultation.annual_km or 15000,
+            consultation.down_payment or 0,
+        )
     return result
 
 
