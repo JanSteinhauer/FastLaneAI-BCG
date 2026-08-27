@@ -11,7 +11,13 @@ from __future__ import annotations
 import pytest
 
 from used_car_advisor.state import Consultation
-from used_car_advisor.tools import ADVISOR_TOOLS, KM_TIERS, TERMS, _check_choices
+from used_car_advisor.tools import (
+    ADVISOR_TOOLS,
+    KM_TIERS,
+    TERMS,
+    _check_choices,
+    _has_recommendation,
+)
 
 # --- no silent rounding -----------------------------------------------------
 
@@ -98,3 +104,47 @@ def test_the_record_matches_what_the_summary_tool_accepts() -> None:
     )
     accepted = set(inspect.signature(decision_summary).parameters)
     assert set(consultation.as_kwargs()) <= accepted
+
+
+# --- a recommendation is not a choice ---------------------------------------
+
+
+def test_a_recommendation_never_lands_in_the_stated_fields() -> None:
+    """advise_car_type writes suggested_*; only the customer fills the rest."""
+    consultation = Consultation()
+    consultation.record(
+        used_for="family",  # they did say this
+        suggested_body_type="estate",
+        suggested_fuel="diesel",
+        suggested_transmission="automatic",
+    )
+    kwargs = consultation.as_kwargs()
+    assert kwargs["used_for"] == "family"
+    assert kwargs["suggested_body_type"] == "estate"
+    assert "body_type" not in kwargs
+    assert "fuel" not in kwargs
+    assert "transmission" not in kwargs
+
+
+def test_a_suggestion_and_a_choice_can_disagree_without_overwriting() -> None:
+    """They were shown an estate and asked for an SUV. Both facts survive."""
+    consultation = Consultation()
+    consultation.record(suggested_body_type="estate")
+    consultation.record(body_type="SUV")
+    assert consultation.suggested_body_type == "estate"
+    assert consultation.body_type == "SUV"
+
+
+def test_both_ends_of_a_budget_are_remembered() -> None:
+    consultation = Consultation()
+    consultation.record(min_budget_monthly_eur=800, budget_monthly_eur=1300)
+    kwargs = consultation.as_kwargs()
+    assert kwargs["min_budget_monthly_eur"] == 800
+    assert kwargs["budget_monthly_eur"] == 1300
+
+
+def test_the_display_gate_needs_something_to_display() -> None:
+    assert not _has_recommendation({})
+    assert not _has_recommendation({"body_types": [], "fuel": None, "reasons": []})
+    assert _has_recommendation({"body_types": ["estate"]})
+    assert _has_recommendation({"fuel": "diesel"})

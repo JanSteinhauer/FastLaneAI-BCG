@@ -259,8 +259,13 @@ def _card(row: dict[str, Any], deal: DealScore | None = None) -> dict[str, Any]:
         "seller": clean_text(row.get("seller_company_name"), 40),
         "partner_dealer": bool(row.get("is_partner")),
     }
-    if deal is not None and deal.peers is not None:
-        card["deal_score"] = deal.score
+    if deal is not None:
+        # The verdict rides along with every card, whether or not the customer
+        # asked — a price they cannot place is the thing they worry about.
+        # The label is always set; the SCORE is withheld when there is no peer
+        # group, because 0.0 out of 5 would read as the worst price on the lot
+        # rather than as "there is nothing to compare this to".
+        card["deal_score"] = deal.score if deal.peers is not None else None
         card["deal_label"] = deal.label
     return card
 
@@ -315,6 +320,7 @@ def advise_car_type(
     carries_cargo: bool | None = None,
     previous_car: str | None = None,
     prefers_automatic: bool | None = None,
+    hobbies: str | None = None,
 ) -> dict:
     """Work out what kind of car someone needs when they cannot name one.
 
@@ -323,11 +329,22 @@ def advise_car_type(
     get back a profile to search with, a reason for every part of it that you
     can read out, and the single best question to ask next.
 
+    Do NOT call this with nothing. Ask first: a call with no answers comes back
+    as questions and nothing else, because there is nothing to recommend yet
+    and nothing may be shown to the customer until there is.
+
     usage: family, commute, city, work, travel, leisure.
     mostly: city, motorway, mixed, rural — where they actually drive.
     can_charge: can they charge at home or at work? This decides electric.
     previous_car: a car they have driven before ("VW Golf") — its size is
     looked up in the listings, not guessed.
+    hobbies: what they do with their time — cycling, a dog, skiing, a caravan,
+    instruments. Often the answer that actually decides the body type, and the
+    one that makes the recommendation theirs rather than generic.
+
+    The answer carries `because`: the list of THEIR circumstances the profile
+    was built from. Say it is your personal recommendation for them, name two
+    or three entries from `because`, and ask them to confirm before searching.
 
     Everything is optional; call it with what you have and ask for the rest.
     """
@@ -341,6 +358,7 @@ def advise_car_type(
         carries_cargo=carries_cargo,
         previous_car_body_type=previous_body,
         prefers_automatic=prefers_automatic,
+        hobbies=hobbies,
     )
     result = profile.as_dict()
     if previous_car and previous_body:
@@ -383,6 +401,7 @@ def _previous_car_body_type(previous_car: str | None) -> str | None:
 @mcp.tool
 def search_cars(
     max_monthly_rate: float | None = None,
+    min_monthly_rate: float | None = None,
     max_price: int | None = None,
     min_price: int | None = None,
     make: str | None = None,
@@ -408,9 +427,19 @@ def search_cars(
 ) -> dict:
     """Find used cars matching what the customer described.
 
-    The key filter is `max_monthly_rate`: customers budget in euros per month,
-    so search by monthly leasing rate whenever they name a monthly budget, and
-    use `max_price` only when they talk about purchase price.
+    The key filter is the monthly rate: customers budget in euros per month, so
+    search on it whenever they name a monthly budget, and use `max_price` /
+    `min_price` only when they talk about the purchase price.
+
+    Pass BOTH bounds whenever the customer gave a range. "Eight hundred to
+    thirteen hundred a month" is `min_monthly_rate=800, max_monthly_rate=1300`
+    — with only the ceiling you would offer them a €120 car, which is not what
+    they asked for. A bare ceiling ("up to", "under", "no more than") means
+    `max_monthly_rate` alone. Never invent a floor the customer did not state.
+
+    When both bounds are given, the results are spread across the range — one
+    car from the lower end, one from the middle, one from the top — so they
+    hear what the whole budget buys rather than three cars at the floor.
 
     mode: "lease" (default) returns only cars that can actually be leased, so
     any result is safe to quote. "buy" is for customers who want to purchase
@@ -435,6 +464,11 @@ def search_cars(
     how = mode.strip().lower()
     if how not in MODES:
         raise ValueError(f"unknown mode '{mode}' — use one of: {', '.join(MODES)}")
+    # A floor above the ceiling is a misheard budget, not an empty result set.
+    # Say so, the way an unknown body type does, so the model can re-ask in the
+    # same turn instead of reporting "nothing matched" for a range that exists.
+    _check_range("monthly rate", min_monthly_rate, max_monthly_rate, "€%s a month")
+    _check_range("purchase price", min_price, max_price, "€%s")
     body = clean_enum(body_type, BODY_TYPES, "body_type")
     fuel_values = clean_enum(fuel, FUELS, "fuel")
     gearbox = clean_enum(transmission, TRANSMISSIONS, "transmission")
@@ -460,6 +494,8 @@ def search_cars(
 
     if max_monthly_rate is not None and how == "lease":
         add("monthly_rate <= $max_rate", max_rate=float(max_monthly_rate))
+    if min_monthly_rate is not None and how == "lease":
+        add("monthly_rate >= $min_rate", min_rate=float(min_monthly_rate))
     if max_price is not None:
         add("price <= $max_price", max_price=int(max_price))
     if min_price is not None:
@@ -501,8 +537,13 @@ def search_cars(
         else "TRUE"
     )
     filters = (" AND " + " AND ".join(where)) if where else ""
-    rows = get_db().query(
-        f"""
+    # A stated range only means something if the shortlist uses it. Spread the
+    # results across the band the customer named — but only when they gave a
+    # floor and did not ask for a particular ordering, so every other search
+    # keeps the ranking it has always had.
+    spread = how == "lease" and min_monthly_rate is not None and sort.strip().lower() == "rate"
+
+    matched = f"""
         WITH priced AS (
             SELECT *,
                    lease_age_years(registration_date) AS age_years,
@@ -512,23 +553,53 @@ def search_cars(
             FROM ads
             WHERE registration_date IS NOT NULL
               AND price IS NOT NULL AND mileage_km IS NOT NULL
+        ),
+        matched AS (
+            -- total_matches is counted over everything that matched, before
+            -- any slicing, so the customer hears the real size of the choice.
+            SELECT *, count(*) OVER () AS total_matches
+            FROM priced
+            WHERE {eligibility}{filters}
+        )"""
+
+    if spread:
+        # Bands are equal by row COUNT (ntile), so there is always one car per
+        # band — but rates bunch at the cheap end, so the lowest car in each
+        # band would still cluster near the floor. Take the car nearest the
+        # middle of its own band instead, and the shortlist actually walks the
+        # range. `limit` is our own validated integer, never caller text.
+        sql = f"""{matched},
+        banded AS (
+            SELECT *, ntile({limit}) OVER (ORDER BY monthly_rate, id) AS band
+            FROM matched
+        ),
+        centres AS (
+            SELECT band, (min(monthly_rate) + max(monthly_rate)) / 2.0 AS middle
+            FROM banded GROUP BY band
         )
-        SELECT *, count(*) OVER () AS total_matches
-        FROM priced
-        WHERE {eligibility}{filters}
+        SELECT banded.* FROM banded JOIN centres USING (band)
+        -- Partner dealers still come first, now within each band rather than
+        -- across the whole shortlist; id breaks ties so results are stable.
+        QUALIFY row_number() OVER (
+            PARTITION BY band
+            ORDER BY is_partner DESC, abs(monthly_rate - middle), id) = 1
+        ORDER BY monthly_rate, id
+        LIMIT $limit
+        """
+    else:
+        sql = f"""{matched}
+        SELECT * FROM matched
         -- Partner dealers first, but only among cars that already match: the
         -- customer's own ranking key still decides the order within each group.
-        ORDER BY is_partner DESC, {order}
+        ORDER BY is_partner DESC, {order}, id
         LIMIT $limit
-        """,
-        params,
-    )
+        """
+    rows = get_db().query(sql, params)
     if not rows:
         return {
             "matches": 0,
             "cars": [],
-            "hint": "Nothing matched. Relax one constraint — a longer term, a "
-            "higher monthly budget, more mileage, a different colour or body type.",
+            "hint": _no_match_hint(min_monthly_rate, max_monthly_rate, min_price, max_price),
         }
     if how == "buy":
         for row in rows:
@@ -546,14 +617,34 @@ def search_cars(
             "annual_km": params["km"],
             "down_payment": params["down"],
         }
+    # Echo the budget that was actually applied, so the advisor can say the
+    # range back and the closing summary can be checked against it.
+    budget = {
+        k: v
+        for k, v in {
+            "min_monthly_rate": min_monthly_rate if how == "lease" else None,
+            "max_monthly_rate": max_monthly_rate if how == "lease" else None,
+            "min_price": min_price,
+            "max_price": max_price,
+        }.items()
+        if v is not None
+    }
+    if budget:
+        result["budget"] = budget
+    if spread:
+        result["ranked"] = (
+            "Spread across the range they asked for — one from the lower end, "
+            "one from the middle, one from the top. Say that is what you did."
+        )
     if any(car["partner_dealer"] for car in cars):
         result["partner_disclosure"] = partners.DISCLOSURE
-    if how == "buy" and max_monthly_rate is not None:
+    if how == "buy" and (max_monthly_rate is not None or min_monthly_rate is not None):
         # Silently dropping a filter is how an agent ends up promising a budget
         # it never applied. Say so instead.
         result["ignored"] = (
             "A monthly rate does not apply when buying outright, so that budget "
-            "was not used. Give a purchase price, or search for leasing instead."
+            "was not used. Give a purchase price with min_price / max_price, or "
+            "search for leasing instead."
         )
     return result
 
@@ -565,6 +656,11 @@ def car_details(ref: str) -> dict:
     Use it when the customer asks about a specific car: equipment, condition,
     consumption, owners, seller. The description is a short scrubbed excerpt of
     the seller's own text.
+
+    The price verdict (`deal_label`, `deal_score`) comes back with it, so the
+    customer never loses sight of whether the car is well priced while you talk
+    about the equipment. Call price_check only when they want the full peer
+    group behind that verdict.
     """
     row = _fetch(ref)
     if looks_injected(row.get("description")):
@@ -576,7 +672,7 @@ def car_details(ref: str) -> dict:
         for item in (row.get(key) or [])[:4]
     ]
     return {
-        **_card(row | {"monthly_rate": None}),
+        **_card(row | {"monthly_rate": None}, _deal(row)),
         "seats": row.get("nr_seats"),
         "doors": row.get("nr_doors"),
         "upholstery": row.get("upholstery"),
@@ -601,8 +697,8 @@ def price_check(ref: str) -> dict:
     same vehicle and body type, within two years and 20,000 km — widened in
     fixed steps until at least five of them exist. The listing is then ranked
     against that peer group's average price on a 0.0-5.0 scale, where 5.0 means
-    a very good price, and labelled the way German buyers know it
-    ("sehr guter Preis", "guter Preis", "fairer Preis").
+    a very good price, and given a plain-English label ("Very good price",
+    "Good price", "Fair price"). Use the label exactly as it comes back.
 
     Use it when the customer asks whether a car is worth the money, and to back
     a recommendation with evidence. Say the label and the score in one short
@@ -682,11 +778,16 @@ def leasing_quote(
             "declined": str(exc),
             "options": leasing_option_table(row["price"]),
         }
+    deal = _deal(row)
     return {
         "ref": _ref(row["id"]),
         "car": _title(row),
         "price_eur": row["price"],
         "monthly_rate_eur": quote.monthly_rate,
+        # The verdict travels with the rate: the moment a customer is asked to
+        # accept a number is the moment they most want to know it is fair.
+        "deal_label": deal.label,
+        "deal_score": deal.score if deal.peers is not None else None,
         "term_months": quote.term_months,
         "annual_km": quote.annual_km,
         "down_payment_eur": quote.down_payment,
@@ -739,10 +840,14 @@ def decision_summary(
     color: str | None = None,
     max_mileage_km: int | None = None,
     budget_monthly_eur: float | None = None,
+    min_budget_monthly_eur: float | None = None,
     finance: str = "lease",
     term_months: int | None = None,
     annual_km: int | None = None,
     down_payment: int = 0,
+    suggested_body_type: str | None = None,
+    suggested_fuel: str | None = None,
+    suggested_transmission: str | None = None,
 ) -> dict:
     """Close the advisory: what they chose, and why this car answers it.
 
@@ -750,6 +855,11 @@ def decision_summary(
     back the preferences they gave you during the conversation; you get a
     summary of their choices and, for each one, whether this car actually meets
     it — checked against the listing, not remembered.
+
+    Keep the two apart. `body_type` / `fuel` / `transmission` are what the
+    CUSTOMER asked for. The `suggested_*` arguments are what advise_car_type
+    recommended and they never confirmed — those come back in their own block,
+    and are never described as their choice.
 
     Read out three or four of the `why_this_car` lines, not all of them, then
     ask which of the `closing_options` they would like.
@@ -765,6 +875,7 @@ def decision_summary(
                 "transmission": clean_text(transmission, 30),
                 "color": clean_text(color, 30),
                 "max_mileage_km": max_mileage_km,
+                "min_budget_monthly_eur": min_budget_monthly_eur,
                 "budget_monthly_eur": budget_monthly_eur,
                 "finance": "purchase" if finance.strip().lower() == "buy" else "leasing",
                 "term_months": term_months,
@@ -775,6 +886,23 @@ def decision_summary(
         },
         "closing_options": closing_options()["options"],
     }
+    # A recommendation the customer never agreed to is not a choice they made.
+    # It is still worth showing — it is why the shortlist looked the way it did
+    # — but it lives in its own block, labelled as ours rather than theirs.
+    if suggestions := {
+        k: v
+        for k, v in {
+            "body_type": clean_text(suggested_body_type, 30),
+            "fuel": clean_text(suggested_fuel, 30),
+            "transmission": clean_text(suggested_transmission, 30),
+        }.items()
+        if v is not None
+    }:
+        summary["suggested"] = suggestions
+        summary["suggested_note"] = (
+            "What I recommended for them, not what they told me. Say it that "
+            "way round — 'I suggested an estate', never 'you wanted an estate'."
+        )
     if not ref:
         summary["why_this_car"] = []
         return summary
@@ -821,7 +949,11 @@ def decision_summary(
         "mileage_km": row["mileage_km"],
         "city": row.get("city"),
     }
-    summary["deal"] = {"score": deal.score, "label": deal.label}
+    # Same key names as every other card, so one renderer handles them all.
+    summary["deal"] = {
+        "deal_label": deal.label,
+        "deal_score": deal.score if deal.peers is not None else None,
+    }
 
     if finance.strip().lower() != "buy":
         try:
@@ -841,12 +973,27 @@ def decision_summary(
                 "down_payment_eur": quote.down_payment,
                 "total_cost_eur": quote.total_cost,
             }
-            if budget_monthly_eur and quote.monthly_rate <= budget_monthly_eur:
-                reasons.insert(
-                    0,
-                    f"€{_grouped(round(quote.monthly_rate))} a month, inside the "
-                    f"€{_grouped(round(budget_monthly_eur))} you wanted to spend.",
-                )
+            # Only claim the rate fits their budget if it fits BOTH ends of it.
+            # A customer who said "eight hundred to thirteen hundred" has not
+            # been served by a €190 car, so that is not a reason to give them.
+            under_ceiling = not budget_monthly_eur or quote.monthly_rate <= budget_monthly_eur
+            over_floor = (
+                not min_budget_monthly_eur or quote.monthly_rate >= min_budget_monthly_eur
+            )
+            if (budget_monthly_eur or min_budget_monthly_eur) and under_ceiling and over_floor:
+                if min_budget_monthly_eur and budget_monthly_eur:
+                    band = (
+                        f"inside the €{_grouped(round(min_budget_monthly_eur))} to "
+                        f"€{_grouped(round(budget_monthly_eur))} you wanted to spend"
+                    )
+                elif budget_monthly_eur:
+                    band = f"inside the €{_grouped(round(budget_monthly_eur))} you wanted to spend"
+                else:
+                    band = (
+                        f"at the €{_grouped(round(min_budget_monthly_eur))} a month "
+                        "level you asked for"
+                    )
+                reasons.insert(0, f"€{_grouped(round(quote.monthly_rate))} a month, {band}.")
     summary["why_this_car"] = reasons
     return summary
 
@@ -998,6 +1145,58 @@ def _invalid_choices(problems: Any, price: int | None = None) -> dict[str, Any]:
         "options": leasing_option_table(price),
         "next": "Read out the reason, offer the values in options, and ask which they want.",
     }
+
+
+def _check_range(what: str, low: float | None, high: float | None, shape: str) -> None:
+    """Refuse a floor above its ceiling, naming both numbers.
+
+    Raised rather than returned, because it is the same class of mistake as an
+    unknown body type: the model misheard, and the message lets it re-ask in
+    the same turn instead of telling the customer that nothing matched.
+    """
+    if low is not None and high is not None and low > high:
+        raise ValueError(
+            f"the lowest {what} ({shape % _grouped(low)}) is above the highest "
+            f"({shape % _grouped(high)}) — ask which way round they meant, then "
+            "search again."
+        )
+
+
+def _no_match_hint(
+    min_rate: float | None,
+    max_rate: float | None,
+    min_price: int | None,
+    max_price: int | None,
+) -> str:
+    """Why nothing matched, in terms of the constraint most likely to be it.
+
+    A stated range is usually the culprit and always the thing the customer
+    will want named — "relax one constraint" is no help when they cannot tell
+    which one is in the way.
+    """
+    if min_rate is not None and max_rate is not None:
+        return (
+            f"Nothing between €{_grouped(min_rate)} and €{_grouped(max_rate)} a "
+            "month also matches the rest of what they asked for. Say so, and "
+            "offer to widen the range or drop one of the other preferences — do "
+            "not quietly search outside the range they gave you."
+        )
+    if min_price is not None and max_price is not None:
+        return (
+            f"Nothing between €{_grouped(min_price)} and €{_grouped(max_price)} "
+            "also matches the rest of what they asked for. Offer to widen the "
+            "range or drop one of the other preferences."
+        )
+    if min_rate is not None:
+        return (
+            f"Nothing at €{_grouped(min_rate)} a month or above matches the rest "
+            "of what they asked for. Offer to lower that floor or drop one of "
+            "the other preferences."
+        )
+    return (
+        "Nothing matched. Relax one constraint — a longer term, a higher "
+        "monthly budget, more mileage, a different colour or body type."
+    )
 
 
 def _fetch(ref: str) -> dict[str, Any]:

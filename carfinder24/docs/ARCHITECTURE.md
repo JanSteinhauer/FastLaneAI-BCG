@@ -22,7 +22,7 @@ hoped for in a prompt.
 | 2 | *"I don't know"* → what is the car FOR? Family, commute, work, trips? Can you charge at home? What have you driven? | `advise_car_type` — deterministic rules in `cars_mcp/advice.py`, with a stated reason for every part of the recommendation |
 | 3 | Cosmetics: colour, body type | `search_cars(color=…)` |
 | 4 | Condition: mileage, age, accidents, service history, owners | `search_cars(max_mileage_km=…, no_accident=…, …)` |
-| 5 | Money: per month or outright; term and mileage tier if leasing | `leasing_options`, `search_cars(mode="buy")`, `leasing_quote` |
+| 5 | Money: per month or outright, as a ceiling **or a range**; term and mileage tier if leasing | `leasing_options`, `search_cars(min_monthly_rate=…, max_monthly_rate=…)`, `search_cars(mode="buy")`, `leasing_quote` |
 | 6 | "So here is what you chose, and why this car" | `decision_summary` — checked against the listing, not recalled |
 | 7 | How to finish: nothing / email the offer / email it with the draft PDF | `closing_options`, `email_offer` |
 
@@ -103,7 +103,7 @@ either layer alone can be talked around.
 The one place we *do* round is `advice.nearest_tier`, when **we** recommend an
 allowance rather than the customer choosing one — and it rounds up, never down.
 
-**4. "Is it a good deal?" is arithmetic, never an opinion.**
+**4. "Is it a good deal?" is arithmetic, never an opinion — and always shown.**
 `cars_deal/quality.py` builds a peer group — same make and model, same vehicle
 and body type, within two years and 20,000 km — widening in fixed steps until
 at least five cars are in it, and scores the listing against that group's
@@ -112,14 +112,29 @@ average price on a 0.0–5.0 scale mapped to the labels German buyers know
 listing, same number, every time; the card on the screen and the verdict on
 request cannot disagree, and a model that has never been asked to *judge* has
 nothing to inflate. A rare car whose peer group never fills scores nothing at
-all — "I cannot tell" is an allowed answer.
+all — "I cannot tell" is an allowed answer, and it is *said* rather than left
+blank: the label is always rendered ("No comparison"), the score is withheld,
+because 0.0 out of 5 would read as the worst price on the lot.
+
+The verdict rides along with every surface that shows a car — the shortlist
+card, `car_details`, the quote, the closing summary — not only with
+`price_check`. It used to appear on search cards alone, so asking "tell me more
+about the second one" redrew the card *without* the rating it just had.
 
 **5. Partner dealers are prioritised in code, and disclosed on the card.**
 Partners come first — but only *within* the cars that already match what the
 customer asked for, and the customer's own ranking key still orders each group.
 A partner car never enters a shortlist by being a partner car, every card
 carries a "★ Partner dealer" badge, and the result set carries the disclosure
-the advisor must give if asked. The snapshot has no partner flag, so the
+the advisor must give if asked.
+
+One qualification, added with range search: when the customer states a budget
+*range*, the shortlist is spread across it (one car per third of the band, each
+the one nearest its band's middle), and partner preference then applies *within
+each band* rather than across the whole shortlist. So a range search can show a
+non-partner car above a partner one. The bound is unchanged — partners are still
+only ever surfaced among cars that already match — but the ordering guarantee is
+per-band, not global. The snapshot has no partner flag, so the
 programme is derived from public reputation in `cars_mcp/partners.py`
 (~15% of dealer listings); swap `PARTNER_DDL` for a contract table when there
 is one.

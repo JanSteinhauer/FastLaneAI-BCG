@@ -97,6 +97,20 @@ def _check_choices(term_months: int | None, annual_km: int | None) -> str | None
     )
 
 
+def _has_recommendation(result: dict[str, Any]) -> bool:
+    """Is there anything here worth putting in front of the customer?
+
+    Nothing is drawn until the visitor has asked for a recommendation or stated
+    a preference. Called with no answers, advise_car_type comes back with
+    questions and nothing else — and drawing that produced a panel of dashes
+    plus a 15 000 km allowance nobody had chosen, which reads to a customer as
+    a set of decisions already taken on their behalf.
+    """
+    return bool(
+        (result.get("body_types") or []) or result.get("fuel") or result.get("transmission")
+    )
+
+
 @function_tool
 async def advise_car_type(
     context: RunContext_T,
@@ -108,6 +122,7 @@ async def advise_car_type(
     carries_cargo: bool | None = None,
     previous_car: str | None = None,
     prefers_automatic: bool | None = None,
+    hobbies: str | None = None,
 ) -> Any:
     """Work out what kind of car someone needs when they cannot name one.
 
@@ -115,10 +130,22 @@ async def advise_car_type(
     guess a body type for them, and never search on a hunch. Ask what the car
     is FOR, pass the answers here, and read out the reasons it gives you.
 
+    Ask BEFORE you call. With no answers there is nothing to recommend, nothing
+    is shown to the customer, and you get questions back instead — so gather at
+    least what the car is for first.
+
     usage: family, commute, city, work, travel, leisure.
     mostly: city, motorway, mixed, rural — where they actually drive.
     can_charge: can they charge at home or at work? That decides electric.
     previous_car: a car they have driven before, e.g. "VW Golf".
+    hobbies: what they do — cycling, a dog, skiing, a caravan, instruments.
+    Ask for this: it usually decides the body type, and it is what makes the
+    advice sound like it was made for them.
+
+    This is a SUGGESTION, not their decision. Say it is your personal
+    recommendation for them, name two or three of the `because` entries it was
+    built from so they hear their own circumstances in it, and ask them to
+    confirm before you search on it.
 
     Everything is optional. Call it with what you have, explain the
     recommendation in one or two sentences, then ask `next_question`.
@@ -135,18 +162,23 @@ async def advise_car_type(
             "carries_cargo": carries_cargo,
             "previous_car": previous_car,
             "prefers_automatic": prefers_automatic,
+            "hobbies": hobbies,
         },
     )
     if isinstance(result, str):
         return result
     body_types = result.get("body_types") or []
+    # What they SAID goes in the record; what we WORKED OUT goes in the
+    # suggested fields. Recording a recommendation as a stated preference is
+    # how the closing summary ends up telling someone they chose an estate.
     context.userdata.consultation.record(
         used_for=usage,
-        body_type=body_types[0] if body_types else None,
-        fuel=result.get("fuel"),
-        transmission=result.get("transmission"),
+        suggested_body_type=body_types[0] if body_types else None,
+        suggested_fuel=result.get("fuel"),
+        suggested_transmission=result.get("transmission"),
     )
-    await ui.push(context, ui.advice_payload(result))
+    if _has_recommendation(result):
+        await ui.push(context, ui.advice_payload(result))
     return result
 
 
@@ -154,7 +186,9 @@ async def advise_car_type(
 async def find_cars(
     context: RunContext_T,
     max_monthly_rate: float | None = None,
+    min_monthly_rate: float | None = None,
     max_price: int | None = None,
+    min_price: int | None = None,
     make: str | None = None,
     model: str | None = None,
     body_type: str | None = None,
@@ -178,14 +212,30 @@ async def find_cars(
 ) -> Any:
     """Search the listings for cars that fit what the customer described.
 
-    Search by MONTHLY RATE (`max_monthly_rate`) whenever the customer names a
-    monthly budget — that is how people actually shop. Use `max_price` only if
-    they talk about the purchase price, and `mode="buy"` if they want to buy
-    the car outright rather than lease it.
+    Search by MONTHLY RATE whenever the customer names a monthly budget — that
+    is how people actually shop. Use `max_price` / `min_price` only if they
+    talk about the purchase price, and `mode="buy"` if they want to buy the car
+    outright rather than lease it.
+
+    GIVE BOTH BOUNDS WHEN THEY GAVE A RANGE. This is the one that matters:
+      "eight hundred to thirteen hundred a month"
+          -> min_monthly_rate=800, max_monthly_rate=1300
+      "around a thousand a month"
+          -> min_monthly_rate=800, max_monthly_rate=1100
+      "up to a thousand" / "under a thousand" / "no more than a thousand"
+          -> max_monthly_rate=1000, and no floor
+    With only the ceiling you will offer a customer with €1300 a month a €120
+    car, which is not what they asked for and reads as though you were not
+    listening. Never invent a floor they did not state, and never search below
+    one they did.
+
+    When both bounds are given the results come back spread across the range —
+    one from the lower end, one from the middle, one near the top — so say that
+    is what you did.
 
     Call this once you have a budget plus one or two preferences. If they could
-    not name preferences, call advise_car_type first and search on what it
-    recommends.
+    not name preferences, call advise_car_type first, get their agreement to
+    what it suggested, and search on that.
 
     body_type: SUV, sedan, estate, coupe, convertible, van, compact.
     fuel: gasoline, diesel, electric, hybrid, electrified.
@@ -212,7 +262,9 @@ async def find_cars(
         "search_cars",
         {
             "max_monthly_rate": max_monthly_rate,
+            "min_monthly_rate": min_monthly_rate,
             "max_price": max_price,
+            "min_price": min_price,
             "make": make,
             "model": model,
             "body_type": body_type,
@@ -244,6 +296,7 @@ async def find_cars(
         color=color,
         max_mileage_km=max_mileage_km,
         budget_monthly_eur=max_monthly_rate,
+        min_budget_monthly_eur=min_monthly_rate,
         finance="buy" if mode == "buy" else "lease",
         term_months=int(term_months),
         annual_km=int(annual_km),

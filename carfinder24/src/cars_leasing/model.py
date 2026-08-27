@@ -246,7 +246,7 @@ def leasing_options(price: int | None = None) -> dict[str, object]:
         "max_down_payment_share": MAX_DOWN_PAYMENT_SHARE,
         "max_car_age_at_end_years": MAX_END_AGE_YEARS,
         "max_odometer_at_end_km": MAX_END_MILEAGE_KM,
-        "contract_type": "Kilometerleasing, private customer, gross rate incl. VAT",
+        "contract_type": "Mileage-based lease, private customer, gross rate incl. VAT",
     }
     if price is not None:
         options["max_down_payment_eur"] = int(MAX_DOWN_PAYMENT_SHARE * price)

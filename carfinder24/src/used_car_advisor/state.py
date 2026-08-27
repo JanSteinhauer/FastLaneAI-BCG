@@ -36,12 +36,21 @@ class Consultation:
     transmission: str | None = None
     color: str | None = None
     max_mileage_km: int | None = None
-    budget_monthly_eur: float | None = None
+    budget_monthly_eur: float | None = None  # the ceiling they named
+    min_budget_monthly_eur: float | None = None  # the floor, if they gave a range
     finance: str = "lease"  # "lease" or "buy"
     term_months: int | None = None
     annual_km: int | None = None
     down_payment: int = 0
     ref: str | None = None  # the car currently on the table
+
+    # What WE recommended, kept strictly apart from what they told us. A
+    # suggestion that leaks into the fields above comes back at the close as
+    # "the estate you wanted" — a choice the customer never made, quoted back
+    # to them as their own. Only advise_car_type writes these.
+    suggested_body_type: str | None = None
+    suggested_fuel: str | None = None
+    suggested_transmission: str | None = None
 
     def record(self, **values: Any) -> None:
         """Remember the values that were actually supplied; ignore the rest.

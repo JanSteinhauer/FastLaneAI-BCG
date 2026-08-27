@@ -3,7 +3,7 @@
 Most customers only want the offer in their inbox. Some ask for the contract
 itself, and for them this renders a *draft* agreement: every term that was
 agreed on the phone, in writing, with the signature blocks that a real
-Leasingvertrag has and an unambiguous DRAFT watermark across the front of it.
+leasing agreement has, and an unambiguous DRAFT watermark across the front.
 
 It is deliberately not executable. Nothing here creates an obligation: the
 document says so in its title, in a box on page one, and again above the
@@ -56,7 +56,7 @@ DRAFT_NOTICE = (
 def _eur(value: float | None) -> str:
     if value is None:
         return "—"
-    return f"{value:,.2f} €".replace(",", " ")
+    return f"€{value:,.2f}".replace(",", " ")
 
 
 def _km(value: float | None) -> str:
@@ -161,13 +161,13 @@ def agreement_pdf(
         author="CarFinder24",
         subject=car.get("title", ""),
     )
-    today = datetime.datetime.now(tz=datetime.UTC).strftime("%d.%m.%Y")
+    today = datetime.datetime.now(tz=datetime.UTC).strftime("%d %B %Y")
     end_km = (car.get("mileage_km") or 0) + quote.annual_km * quote.term_months // 12
 
     story: list[Any] = [
-        Paragraph("Leasingvertrag — Entwurf", styles["title"]),
+        Paragraph("Leasing agreement — draft", styles["title"]),
         Paragraph(
-            f"Draft leasing agreement · Kilometerleasing · private customer<br/>"
+            f"Mileage-based lease · private customer<br/>"
             f"Reference {reference} · drawn up {today}",
             styles["subtitle"],
         ),
@@ -200,17 +200,17 @@ def agreement_pdf(
         Paragraph("3 · Financial terms", styles["h2"]),
         _facts_table(
             [
-                ("Contract type", "Kilometerleasing (mileage leasing), private customer"),
+                ("Contract type", "Mileage-based lease, private customer"),
                 ("Term", f"{quote.term_months} months"),
                 ("Mileage allowance", f"{_km(quote.annual_km)} per year"),
-                ("Down payment (Sonderzahlung)", _eur(quote.down_payment)),
+                ("Down payment", _eur(quote.down_payment)),
                 ("Monthly rate, gross incl. VAT", _eur(quote.monthly_rate)),
                 ("— of which depreciation", _eur(quote.monthly_depreciation)),
                 ("— of which finance charge", _eur(quote.monthly_finance)),
                 ("Nominal annual rate", f"{quote.apr * 100:.2f} %"),
                 ("Projected residual value at end of term", _eur(quote.residual_value)),
                 ("Total payments over the term", _eur(quote.total_cost)),
-                ("Excess mileage", f"{EXTRA_KM_VALUE:.2f} € per kilometre"),
+                ("Excess mileage", f"€{EXTRA_KM_VALUE:.2f} per kilometre"),
                 ("Projected odometer at return", _km(end_km)),
             ],
             strong={"Monthly rate, gross incl. VAT", "Total payments over the term"},
@@ -313,7 +313,7 @@ def _signature_row(customer_name: str) -> Table:
 
 
 def agreement_filename(reference: str) -> str:
-    return f"CarFinder24-Leasingvertrag-Entwurf-{reference}.pdf"
+    return f"CarFinder24-draft-leasing-agreement-{reference}.pdf"
 
 
 def _demo_pdf() -> bytes:

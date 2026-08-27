@@ -18,7 +18,15 @@ from cars_deal.quality import (
     peer_query,
     score_offer,
 )
-from cars_mcp.server import get_db, price_check, search_cars
+from cars_mcp.server import (
+    car_details,
+    decision_summary,
+    get_db,
+    leasing_quote,
+    price_check,
+    search_cars,
+)
+from used_car_advisor.ui import _rating
 
 
 def peers(average: float, n: int = 40) -> PeerGroup:
@@ -34,7 +42,7 @@ def peers(average: float, n: int = 40) -> PeerGroup:
 def test_the_average_price_scores_exactly_in_the_middle() -> None:
     deal = score_offer(20_000, peers(20_000))
     assert deal.score == 2.5
-    assert deal.label == "Fairer Preis"
+    assert deal.label == "Fair price"
     assert deal.difference_pct == 0.0
 
 
@@ -58,10 +66,11 @@ def test_a_full_discount_earns_full_marks() -> None:
 
 @pytest.mark.parametrize(
     ("score", "label"),
-    [(5.0, "Sehr guter Preis"), (4.0, "Sehr guter Preis"), (3.5, "Guter Preis"),
-     (2.5, "Fairer Preis"), (1.5, "Erhöhter Preis"), (0.0, "Hoher Preis")],
+    [(5.0, "Very good price"), (4.0, "Very good price"), (3.5, "Good price"),
+     (2.5, "Fair price"), (1.5, "Increased price"), (0.0, "High price")],
 )
-def test_scores_map_to_the_labels_german_buyers_know(score, label) -> None:
+def test_scores_map_to_the_labels_a_buyer_understands(score, label) -> None:
+    """Every label a customer can hear is English — see the product language rule."""
     assert label_for(score)[0] == label
 
 
@@ -77,7 +86,7 @@ def test_the_verdict_says_the_number_and_what_it_was_compared_against() -> None:
 
 def test_too_few_comparable_cars_means_no_verdict() -> None:
     deal = score_offer(20_000, peers(20_000, n=MIN_PEERS - 1))
-    assert deal.label == "Kein Vergleich"
+    assert deal.label == "No comparison"
     assert "too few" in deal.explanation
 
 
@@ -143,3 +152,63 @@ def test_search_results_carry_the_same_score_price_check_gives() -> None:
     for car in search_cars(max_monthly_rate=350, limit=3)["cars"]:
         if "deal_score" in car:
             assert price_check(car["ref"])["score"] == car["deal_score"]
+
+
+# --- the rating is always on screen -----------------------------------------
+#
+# It used to ride only on search cards. Asking "tell me more about the second
+# one" called car_details, which redrew the card WITHOUT the rating it just
+# had — the rating disappeared exactly when the customer leaned in.
+
+
+def test_car_details_carries_the_rating_too() -> None:
+    ref = search_cars(max_monthly_rate=400, limit=1)["cars"][0]["ref"]
+    details = car_details(ref)
+    assert details["deal_label"]
+    assert details["deal_score"] == price_check(ref)["score"]
+
+
+def test_the_quote_carries_the_rating_next_to_the_rate() -> None:
+    ref = search_cars(max_monthly_rate=400, limit=1)["cars"][0]["ref"]
+    quote = leasing_quote(ref, 36, 15_000)
+    assert quote["deal_label"] == price_check(ref)["label"]
+    assert quote["deal_score"] == price_check(ref)["score"]
+
+
+def test_the_closing_summary_carries_the_rating() -> None:
+    ref = search_cars(max_monthly_rate=400, limit=1)["cars"][0]["ref"]
+    summary = decision_summary(ref=ref, term_months=36, annual_km=15_000)
+    assert summary["deal"]["deal_label"] == price_check(ref)["label"]
+
+
+def test_every_surface_reads_the_same_number() -> None:
+    """One listing, four surfaces, one verdict — they cannot drift apart."""
+    ref = search_cars(max_monthly_rate=500, limit=1)["cars"][0]["ref"]
+    card = search_cars(max_monthly_rate=500, limit=1)["cars"][0]
+    verdicts = {
+        card["deal_label"],
+        car_details(ref)["deal_label"],
+        leasing_quote(ref, 36, 15_000)["deal_label"],
+        decision_summary(ref=ref, term_months=36, annual_km=15_000)["deal"]["deal_label"],
+        price_check(ref)["label"],
+    }
+    assert len(verdicts) == 1, verdicts
+
+
+def test_an_unratable_car_gets_a_line_rather_than_a_gap() -> None:
+    """"I cannot tell" is an allowed answer; a missing line is not."""
+    unratable = _card_without_peers()
+    assert unratable["deal_label"] == "No comparison"
+    # Never 0.0: that would read as the worst price on the lot.
+    assert unratable["deal_score"] is None
+    assert _rating(unratable) == "No comparison"
+
+
+def _card_without_peers() -> dict:
+    from cars_mcp.server import _card
+
+    return _card(
+        {"id": "0" * 36, "make": "Rare", "model": "Thing", "price": 20_000,
+         "mileage_km": 50_000, "registration_date": None, "monthly_rate": None},
+        score_offer(20_000, None),
+    )

@@ -40,18 +40,141 @@ ROADS = {"city", "motorway", "mixed", "rural"}
 DEFAULT_TERM = 36
 
 
+@dataclass(frozen=True)
+class Hobby:
+    """What a pastime implies about the car, and how to say that out loud.
+
+    A recommendation is only persuasive if the person can hear themselves in
+    it, so what someone does at the weekend is a real input: it is usually the
+    thing that decides between an estate and a sedan.
+    """
+
+    label: str  # for the "because you told me" line: "you cycle"
+    body_types: tuple[str, ...]  # nudged up the list, never past a seat count
+    reason: str
+
+
+#: Matched by substring against whatever the visitor said, so "I cycle and we
+#: have a dog" finds both. An unrecognised pastime is ignored rather than
+#: rejected — the same rule the rest of this module follows for half-understood
+#: answers. Keys are lowercase fragments; German words are included because
+#: visitors say them even mid-English-sentence.
+HOBBIES: tuple[tuple[tuple[str, ...], Hobby], ...] = (
+    (
+        ("cycl", "bike", "bicycle", "rad", "mountainbik"),
+        Hobby(
+            "you cycle",
+            ("estate", "SUV"),
+            "Bikes go inside an estate with the seats down — no rack, no roof "
+            "bars, nothing to lift over your head.",
+        ),
+    ),
+    (
+        ("dog", "hund", "pet"),
+        Hobby(
+            "you have a dog",
+            ("estate",),
+            "A dog travels best on a flat boot floor, which is exactly what an "
+            "estate gives you.",
+        ),
+    ),
+    (
+        ("ski", "snowboard", "winter sport"),
+        Hobby(
+            "you ski",
+            ("SUV", "estate"),
+            "For ski trips the load height and four-wheel drive are worth "
+            "paying for, so I would look at an SUV or a big estate.",
+        ),
+    ),
+    (
+        ("golf bag", "golfing", "plays golf", "play golf"),
+        Hobby(
+            "you play golf",
+            ("sedan", "estate"),
+            "A golf bag needs boot depth rather than boot height, so a sedan "
+            "or an estate carries it better than something tall.",
+        ),
+    ),
+    (
+        ("camp", "caravan", "trailer", "tow", "anhänger", "wohnwagen"),
+        Hobby(
+            "you tow a caravan or trailer",
+            ("SUV", "estate"),
+            "Towing needs weight behind it and a tow bar, which rules out the "
+            "small end and points at an SUV or a large estate.",
+        ),
+    ),
+    (
+        ("surf", "kayak", "climb", "kletter", "diving", "tauch"),
+        Hobby(
+            "you carry bulky kit",
+            ("estate", "SUV", "van"),
+            "Kit that long only fits flat, so you want a load bay rather than "
+            "a boot.",
+        ),
+    ),
+    (
+        ("music", "band", "dj", "drum", "cello", "guitar"),
+        Hobby(
+            "you carry instruments",
+            ("estate", "van"),
+            "Instruments want a square, flat space you can load without "
+            "tilting anything.",
+        ),
+    ),
+    (
+        ("horse", "pferd", "reit"),
+        Hobby(
+            "you ride",
+            ("SUV", "estate"),
+            "A horsebox is a towing job, so the car needs the weight and the "
+            "tow bar for it.",
+        ),
+    ),
+)
+
+
+def _hobbies(text: str | None) -> list[Hobby]:
+    """Every pastime we recognise in what they said, in declaration order."""
+    said = (text or "").strip().lower()
+    if not said:
+        return []
+    return [hobby for keys, hobby in HOBBIES if any(key in said for key in keys)]
+
+
 @dataclass
 class Profile:
-    """What kind of car this person needs, and why."""
+    """What kind of car this person needs, and why.
+
+    `annual_km` stays None until the customer actually names a mileage. It used
+    to default to 15 000, which meant an allowance nobody had chosen was drawn
+    on their screen as though they had — see `because` for the other half of
+    the same idea.
+    """
 
     body_types: list[str] = field(default_factory=list)  # search vocabulary
     fuel: str | None = None
     transmission: str | None = None
     min_seats: int | None = None
-    annual_km: int = 15_000
+    annual_km: int | None = None
     term_months: int = DEFAULT_TERM
     reasons: list[str] = field(default_factory=list)
     open_questions: list[str] = field(default_factory=list)
+    #: The circumstances this recommendation was actually built from, in the
+    #: customer's own terms ("five of you", "mostly motorway"). This is what
+    #: makes the advice legibly *theirs* rather than a generic table, so the
+    #: advisor can name it and the screen can lead with it.
+    because: list[str] = field(default_factory=list)
+
+    def is_empty(self) -> bool:
+        """True when nothing was actually derived — only questions came back.
+
+        The caller uses this to decide whether there is anything worth showing
+        the customer yet. Nothing goes on their screen before they have asked
+        for a recommendation or stated a preference.
+        """
+        return not self.body_types and not self.fuel and not self.transmission
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -62,12 +185,20 @@ class Profile:
             "annual_km": self.annual_km,
             "term_months": self.term_months,
             "reasons": self.reasons,
+            "because": self.because,
+            "is_personal": bool(self.because),
             "next_question": self.open_questions[0] if self.open_questions else None,
             "open_questions": self.open_questions,
             "search_hint": (
                 "Search with body_type = the first entry of body_types, plus the "
                 "fuel and transmission above. Offer the alternatives only if the "
                 "first search comes back thin."
+            ),
+            "how_to_say_it": (
+                "This is YOUR recommendation for THIS person: say so, and name "
+                "the two or three entries from `because` it came from, so they "
+                "hear their own circumstances in it. Then ask them to confirm "
+                "before you search on it — it is a suggestion until they agree."
             ),
         }
 
@@ -82,18 +213,48 @@ def recommend_profile(
     carries_cargo: bool | None = None,
     previous_car_body_type: str | None = None,
     prefers_automatic: bool | None = None,
+    hobbies: str | None = None,
 ) -> Profile:
     """Turn use-case answers into a car profile, with a reason for every choice.
 
     `previous_car_body_type` is the body type of a car they have driven before
     (looked up in the listings, not guessed) — people are happiest in roughly
     the size they are used to, so it breaks ties.
+
+    `hobbies` is whatever they said they do — cycling, a dog, skiing, towing a
+    caravan. It is often the answer that actually decides the body type, and it
+    is what makes the recommendation sound like it was made for them.
     """
     profile = Profile()
     use = (usage or "").strip().lower()
     road = (mostly or "").strip().lower()
     if road not in ROADS:
         road = ""
+    pastimes = _hobbies(hobbies)
+
+    # -- what this recommendation is built from ------------------------------
+    # Collected before anything is derived, so the advisor can always say which
+    # of THEIR answers produced the advice. No entry here that they did not
+    # tell us; an empty list means we are still guessing and should not.
+    if passengers is not None:
+        profile.because.append(
+            "it is just you" if passengers <= 1 else f"there are {passengers} of you"
+        )
+    if use in USES:
+        profile.because.append(USES[use])
+    if annual_km is not None:
+        profile.because.append(f"{_km(annual_km)} km a year")
+    if road:
+        profile.because.append(f"mostly {road} driving")
+    if can_charge is True:
+        profile.because.append("you can charge at home or at work")
+    elif can_charge is False:
+        profile.because.append("no charger where you park")
+    if carries_cargo:
+        profile.because.append("you carry things")
+    profile.because.extend(hobby.label for hobby in pastimes)
+    if previous_car_body_type:
+        profile.because.append(f"you have driven a {previous_car_body_type}")
 
     # -- size and shape ------------------------------------------------------
     if passengers is not None and passengers >= 6:
@@ -106,32 +267,40 @@ def recommend_profile(
     elif use == "family" or (passengers is not None and passengers >= 4):
         profile.body_types = ["estate", "SUV", "van"]
         profile.min_seats = 5
+        who = (
+            f"there are {passengers} of you"
+            if passengers is not None
+            else "you are buying this for the family"
+        )
         profile.reasons.append(
-            "For a family the boot matters more than the badge — an estate gives "
-            "you the most space per euro, an SUV the easier loading height."
+            f"Since {who}, the boot matters more to you than the badge — an "
+            "estate gives you the most space per euro, an SUV the easier "
+            "loading height."
         )
     elif use == "city":
         profile.body_types = ["compact", "sedan"]
         profile.reasons.append(
-            "In the city a compact car is easier to park and cheaper to run; "
-            "anything larger you pay for twice."
+            "You said the car is for the city, and there a compact is easier to "
+            "park and cheaper to run; anything larger you pay for twice."
         )
     elif use == "work":
         profile.body_types = ["van", "estate", "SUV"]
         profile.reasons.append(
-            "If the car has to earn its keep, load space is the deciding feature."
+            "Your car has to earn its keep, so load space is the deciding "
+            "feature — everything else comes second to what fits in the back."
         )
     elif use == "travel":
         profile.body_types = ["estate", "sedan", "SUV"]
         profile.reasons.append(
-            "For long trips, comfort on the motorway matters most — an estate or "
-            "a sedan is quieter and steadier than something tall."
+            "You are planning long trips, and for those comfort on the motorway "
+            "matters most — an estate or a sedan is quieter and steadier than "
+            "something tall."
         )
     elif use in {"commute", "leisure"}:
         profile.body_types = ["compact", "sedan", "estate"]
         profile.reasons.append(
-            "For that kind of driving a compact or a sedan is the sensible "
-            "middle: cheap to run, comfortable enough for a long day."
+            f"For {USES[use]} a compact or a sedan is the sensible middle for "
+            "you: cheap to run, comfortable enough for a long day."
         )
     else:
         profile.open_questions.append(
@@ -142,6 +311,23 @@ def recommend_profile(
     if carries_cargo and "estate" not in profile.body_types:
         profile.body_types.insert(0, "estate")
         profile.reasons.append("You mentioned carrying things, so an estate first.")
+
+    # -- what they actually do with it ---------------------------------------
+    # A pastime never outranks a seat count — six people still need six seats —
+    # but within the shapes that already fit, it is usually the answer that
+    # decides between an estate and a sedan.
+    may_reorder = profile.min_seats is None or profile.min_seats <= 5
+    for hobby in pastimes:
+        if not profile.body_types:
+            profile.body_types = list(hobby.body_types)
+        elif may_reorder:
+            for body in reversed(hobby.body_types):
+                if body in profile.body_types:
+                    profile.body_types.remove(body)
+                    profile.body_types.insert(0, body)
+                elif len(profile.body_types) < 4:
+                    profile.body_types.append(body)
+        profile.reasons.append(hobby.reason)
 
     if previous_car_body_type:
         previous = previous_car_body_type.strip().lower()
@@ -215,8 +401,14 @@ def recommend_profile(
                 f"{_km(km)} km."
             )
     profile.term_months = DEFAULT_TERM
+    if not pastimes:
+        profile.open_questions.append(
+            "And what do you do at the weekend — bikes, a dog, skis, a trailer? "
+            "That is usually what decides the shape of the car."
+        )
     profile.open_questions.append(
-        "And what would you like to spend per month? That is what I search on."
+        "And what would you like to spend per month — a ceiling, or a range "
+        "from and to? That is what I search on."
     )
     return profile
 

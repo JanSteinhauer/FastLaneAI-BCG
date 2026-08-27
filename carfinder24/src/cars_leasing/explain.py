@@ -126,7 +126,7 @@ def explain_leasing(quote: LeasingQuote | None = None) -> dict[str, Any]:
 
     result: dict[str, Any] = {
         "headline": HEADLINE,
-        "contract_type": "Kilometerleasing (mileage leasing), private customer",
+        "contract_type": "Mileage-based lease, private customer",
         "steps": steps,
         "constants": {
             "nominal_annual_rate_pct": round(APR * 100, 2),

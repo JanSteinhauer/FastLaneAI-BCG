@@ -50,6 +50,21 @@ def _eur(value: float | None, decimals: int = 0) -> str:
     return f"€{value:,.{decimals}f}".replace(",", " ")
 
 
+def _rating(card: dict[str, Any]) -> str:
+    """The price verdict, in one line — always shown, asked for or not.
+
+    "/5" is appended only when there is a score behind it. A car whose peer
+    group never filled still gets its line ("No comparison"), because a missing
+    rating has to read as "I cannot tell" rather than as a line we dropped —
+    and never as 0.0 out of 5, which would read as the worst price on the lot.
+    """
+    label = card.get("deal_label")
+    if not label:
+        return ""
+    score = card.get("deal_score")
+    return f"{label} {score}/5" if score is not None else str(label)
+
+
 def cars_payload(cars: list[dict[str, Any]], terms: dict[str, Any] | None = None) -> dict:
     """Listing cards — monthly rate first, because that is what customers compare."""
     return {
@@ -72,9 +87,7 @@ def cars_payload(cars: list[dict[str, Any]], terms: dict[str, Any] | None = None
                     x
                     for x in (
                         _eur(car.get("price_eur")) + " listing price",
-                        f"{car['deal_label']} {car['deal_score']}/5"
-                        if car.get("deal_label")
-                        else None,
+                        _rating(car) or None,
                     )
                     if x
                 ),
@@ -122,6 +135,9 @@ def quote_payload(quote: dict[str, Any]) -> dict:
         "headline": _eur(quote.get("monthly_rate_eur"), 2),
         "headline_note": "per month, gross",
         "rows": [
+            # First row: the moment a customer is asked to accept a number is
+            # the moment they most want to know the price is fair.
+            ["Price rating", _rating(quote) or "—"],
             ["Term", f"{quote.get('term_months')} months"],
             ["Mileage", f"{quote.get('annual_km', 0):,} km / year".replace(",", " ")],
             ["Down payment", _eur(quote.get("down_payment_eur"))],
@@ -151,25 +167,44 @@ def text_payload(text: str) -> dict:
 
 
 def advice_payload(profile: dict[str, Any]) -> dict:
-    """What kind of car we think they need, and the reason for each part of it."""
+    """Our recommendation for THIS person, and the circumstances behind it.
+
+    Two rules hold here. Every row is something actually derived from what the
+    customer said — an empty profile draws nothing at all (the caller checks),
+    and a default nobody chose is not a row. And the panel says whose idea this
+    is: it leads with *their* circumstances, so the advice reads as personal
+    rather than as a set of decisions already taken on their behalf.
+    """
     body_types = profile.get("body_types") or []
-    rows = [["Body type", ", ".join(body_types) or "—"]]
+    because = profile.get("because") or []
+    rows: list[list[str]] = []
+    if because:
+        rows.append(["Because you told me", ", ".join(str(b) for b in because)])
+    if body_types:
+        rows.append(["Body type", ", ".join(body_types)])
     if profile.get("fuel"):
         rows.append(["Fuel", str(profile["fuel"])])
     if profile.get("transmission"):
         rows.append(["Transmission", str(profile["transmission"])])
     if profile.get("min_seats"):
         rows.append(["Seats", f"at least {profile['min_seats']}"])
-    rows.append(
-        ["Mileage allowance", f"{profile.get('annual_km', 0):,} km / year".replace(",", " ")]
-    )
+    # Only when they named a mileage. This row used to be drawn unconditionally
+    # from a 15 000 km default, which put an allowance on their screen that
+    # nobody had agreed to.
+    if profile.get("annual_km"):
+        rows.append(
+            ["Mileage allowance", f"{profile['annual_km']:,} km / year".replace(",", " ")]
+        )
     rows += [["Why", reason] for reason in (profile.get("reasons") or [])]
+    first = body_types[0] if body_types else ""
     return _panel(
-        "What would suit you",
-        (body_types[0] if body_types else "Let's narrow it down").title(),
-        "our recommendation",
+        "My recommendation for you",
+        # Not .title(): that turned "Let's narrow it down" into "Let'S Narrow
+        # It Down" and "SUV" into "Suv".
+        (first[:1].upper() + first[1:]) if first else "A place to start",
+        "personal — based on what you told me",
         rows,
-        "A starting point, not a decision — say so if it does not sound like you.",
+        "A suggestion, not a decision — say so if it does not sound like you.",
     )
 
 
@@ -251,11 +286,31 @@ def summary_payload(summary: dict[str, Any]) -> dict:
     """The closing summary: their choices, this car, and why the two match."""
     car = summary.get("car") or {}
     leasing = summary.get("leasing") or {}
-    rows = [
-        [_label(key), _value(value)] for key, value in (summary.get("choices") or {}).items()
+    choices = summary.get("choices") or {}
+    low, high = choices.get("min_budget_monthly_eur"), choices.get("budget_monthly_eur")
+    rows: list[list[str]] = []
+    for key, value in choices.items():
+        if key == "min_budget_monthly_eur":
+            continue  # folded into the single budget row below
+        if key == "budget_monthly_eur":
+            rows.append(["Budget", _budget_text(low, high)])
+            continue
+        rows.append([_label(key), _value(value)])
+    if low is not None and high is None:  # a floor on its own still gets said
+        rows.append(["Budget", _budget_text(low, None)])
+    # What we suggested is listed apart from what they chose, and labelled as
+    # ours. Folding the two together is how a summary ends up telling someone
+    # they asked for an estate when all they did was not disagree with one.
+    rows += [
+        [f"I suggested ({_label(key)})", _value(value)]
+        for key, value in (summary.get("suggested") or {}).items()
     ]
     if leasing.get("monthly_rate_eur"):
         rows.append(["Your rate", f"{_eur(leasing['monthly_rate_eur'], 2)} / month"])
+    # The verdict belongs on the closing card too — this is the last thing they
+    # see before saying yes.
+    if rating := _rating(summary.get("deal") or {}):
+        rows.append(["Price rating", rating])
     rows += [["Why this car", reason] for reason in (summary.get("why_this_car") or [])]
     return _panel(
         car.get("title", "Your choice"),
@@ -266,9 +321,28 @@ def summary_payload(summary: dict[str, Any]) -> dict:
     )
 
 
+#: The keys the generic rule below mangles — "annual_km" came out as "Annual".
+_LABELS = {
+    "annual_km": "Annual mileage",
+    "max_mileage_km": "Maximum mileage",
+    "down_payment_eur": "Down payment",
+}
+
+
 def _label(key: str) -> str:
-    """'budget_monthly_eur' -> 'Budget monthly'."""
+    """'budget_monthly_eur' -> 'Budget monthly'; a few need saying properly."""
+    if key in _LABELS:
+        return _LABELS[key]
     return key.replace("_eur", "").replace("_km", "").replace("_", " ").capitalize()
+
+
+def _budget_text(low: float | None, high: float | None) -> str:
+    """Their budget as one line, however many ends of it they gave us."""
+    if low is not None and high is not None:
+        return f"{_eur(low)} to {_eur(high)} / month"
+    if high is not None:
+        return f"up to {_eur(high)} / month"
+    return f"from {_eur(low)} / month"
 
 
 def _value(value: Any) -> str:

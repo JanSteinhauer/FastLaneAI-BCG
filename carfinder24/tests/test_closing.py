@@ -115,7 +115,7 @@ def test_the_agreement_says_draft_on_its_face(draft) -> None:
     """A voice agent must not be able to produce a document that looks binding."""
     page = _page_text(draft)
     assert "DRAFT" in page  # the watermark
-    assert "Entwurf" in page  # the title
+    assert "draft" in page  # the title
     assert "not a concluded contract" in page
     assert "Unsigned draft" in page  # above the signature lines
 
@@ -124,11 +124,11 @@ def test_the_agreement_states_the_terms_that_were_quoted(draft) -> None:
     page = _page_text(draft)
     assert "36 months" in page
     assert "15 000 km per year" in page
-    assert "Kilometerleasing" in page
+    assert "Mileage-based lease" in page
 
 
 def test_the_filename_cannot_be_mistaken_for_a_signed_contract() -> None:
-    assert "Entwurf" in agreement_filename("CF24-ABC123")
+    assert "draft" in agreement_filename("CF24-ABC123")
 
 
 def test_an_attachment_survives_the_trip_through_mime(draft) -> None:

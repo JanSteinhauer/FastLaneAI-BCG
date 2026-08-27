@@ -7,8 +7,8 @@ it is the one an LLM must never answer from feel. So the verdict is arithmetic:
    same vehicle and body type, similar age, similar odometer;
 2. take the peer group's **average price**;
 3. score this listing against it on a fixed **0.0 – 5.0** scale, where 5.0 is a
-   very good deal, and map the score to the label German buyers know
-   (*sehr guter Preis* / *guter Preis* / *fairer Preis* / …).
+   very good deal, and map the score to a plain-English label
+   (*Very good price* / *Good price* / *Fair price* / …).
 
 Determinism is the whole point: same snapshot, same listing, same number, every
 time — so the advisor can say it out loud and the email can repeat it.
@@ -118,7 +118,7 @@ def score_offer(price: int, peers: PeerGroup | None) -> DealScore:
     if peers is None or peers.n < MIN_PEERS or not peers.average_price:
         return DealScore(
             score=0.0,
-            label="Kein Vergleich",
+            label="No comparison",
             label_en="not enough comparable cars",
             difference_pct=0.0,
             peers=peers,
