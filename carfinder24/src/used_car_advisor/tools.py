@@ -357,6 +357,10 @@ async def _push_one_car(
     list price leading and the reason attached — rather than falling back to a
     tile that would print the price twice.
     """
+    if refusal := _check_choices(term_months, annual_km):
+        await ui.push(context, ui.text_payload(refusal.split(" Say this")[0]))
+        return refusal
+
     details = await _call(context, "car_details", {"ref": ref})
     if isinstance(details, str):
         return details
@@ -370,8 +374,8 @@ async def _push_one_car(
         "leasing_quote",
         {
             "ref": ref,
-            "term_months": _nearest(int(term_months), TERMS),
-            "annual_km": _nearest(int(annual_km), KM_TIERS),
+            "term_months": int(term_months),
+            "annual_km": int(annual_km),
             "down_payment": int(down_payment),
         },
     )
