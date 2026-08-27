@@ -714,3 +714,66 @@ body::before {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* --- Email-sent toast -----------------------------------------------------
+   Fires when email_offer reports success (payload {"type":"sent"}); markup in
+   frontend/src/main.jsx, chime synthesised there too. Brand colours are literal
+   here rather than tokens: this badge is always the accent on dark ink, in
+   either theme. */
+
+.toast {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(340px, calc(100vw - 36px));
+  padding: 13px 18px 13px 15px;
+  border-radius: 10px;
+  background: #00E0B5;
+  color: #0f1720;
+  box-shadow: 0 12px 34px rgb(0 0 0 / 0.42), 0 0 0 1px rgb(0 0 0 / 0.06);
+  animation: toast-in 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.toast-icon {
+  flex: none;
+  width: 23px;
+  height: 23px;
+  color: #0f1720;
+}
+
+.toast-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.toast-title {
+  font-size: 0.94rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #0f1720;
+}
+
+.toast-sub {
+  font-size: 0.78rem;
+  color: #0f1720;
+  opacity: 0.72;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-10px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
+}

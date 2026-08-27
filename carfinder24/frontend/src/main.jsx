@@ -30,6 +30,61 @@ function BrandHeader({ live = false }) {
   );
 }
 
+// A short two-note chime for the moment the offer lands. Synthesised rather
+// than shipped as an audio file: no asset to load, nothing to go missing, and
+// it stays quiet enough not to fight the advisor's voice.
+let audioCtx = null;
+
+function playSentChime() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    audioCtx = audioCtx || new Ctx();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const now = audioCtx.currentTime;
+    // A5 then E6 — a rising interval reads as "done", not as an alert.
+    [[880, 0], [1318.51, 0.085]].forEach(([freq, offset]) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, now + offset);
+      gain.gain.exponentialRampToValueAtTime(0.11, now + offset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.4);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now + offset);
+      osc.stop(now + offset + 0.42);
+    });
+  } catch (e) {
+    // Audio is a nicety; never let it break the call.
+  }
+}
+
+function Toast({ payload, onClose }) {
+  useEffect(() => {
+    if (!payload) return undefined;
+    const timer = setTimeout(onClose, 5200);
+    return () => clearTimeout(timer);
+  }, [payload, onClose]);
+
+  if (!payload) return null;
+  const detail = [payload.recipient, payload.reference].filter(Boolean).join(" \u00b7 ");
+
+  return (
+    <div className="toast" role="status" aria-live="polite">
+      <svg className="toast-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="2.75" y="4.75" width="18.5" height="14.5" rx="2.25" stroke="currentColor" strokeWidth="1.7" />
+        <path d="m3.5 7 7.35 5.4a2 2 0 0 0 2.3 0L20.5 7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      </svg>
+      <div className="toast-body">
+        <span className="toast-title">Offer sent</span>
+        {detail && <span className="toast-sub">{detail}</span>}
+      </div>
+    </div>
+  );
+}
+
 // Renders whatever an agent tool pushed via used_car_advisor.ui.push (topic "ui").
 // Payload shapes: cars | quote | sent | text — see src/used_car_advisor/ui.py.
 function CarCard({ car }) {
@@ -153,6 +208,7 @@ function Chat() {
     useVoiceAssistant();
   const room = useRoomContext();
   const [payload, setPayload] = useState(null);
+  const [toast, setToast] = useState(null);
   const persona = agentAttributes?.agent;
   const auraColor = agentAttributes?.agent_color || DEFAULT_AURA_COLOR;
 
@@ -210,10 +266,17 @@ function Chat() {
   useEffect(() => {
     room.registerTextStreamHandler("ui", async (reader) => {
       const text = await reader.readAll();
+      let data;
       try {
-        setPayload(JSON.parse(text));
+        data = JSON.parse(text);
       } catch {
-        setPayload({ type: "text", text });
+        data = { type: "text", text };
+      }
+      setPayload(data);
+      // The email is the end of the journey — announce it, don't just draw it.
+      if (data.type === "sent") {
+        setToast(data);
+        playSentChime();
       }
     });
     return () => room.unregisterTextStreamHandler("ui");
@@ -227,6 +290,7 @@ function Chat() {
         {persona && <> — {persona}</>}
       </p>
       <ToolPanel payload={payload} />
+      <Toast payload={toast} onClose={() => setToast(null)} />
       <div className="controls">
         <TrackToggle source={Track.Source.Microphone}>Mic</TrackToggle>
         <DisconnectButton>End chat</DisconnectButton>

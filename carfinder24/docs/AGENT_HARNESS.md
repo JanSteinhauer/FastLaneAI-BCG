@@ -57,6 +57,24 @@ across, so the new persona infers everything from the conversation.
   update `MCP_URL` in `.env` and restart the agent.
 - When things get weird: restart 1 → 2 → 3, reload the page, fresh chat.
 
+## The email toast
+
+A successful `email_offer` pushes `{"type": "sent", ...}` on the "ui" channel.
+The frontend does two things with it: draws the confirmation card in the panel,
+and fires a toast in the top-right — accent `#00E0B5` on ink `#0f1720`, envelope
+icon, recipient and reference underneath, gone after five seconds.
+
+It also plays a two-note chime (A5 → E6), synthesised with the Web Audio API
+rather than shipped as a file, so there is no asset to load and nothing to go
+missing on the day. It is deliberately quiet — the advisor is usually still
+speaking — and every part of it is wrapped so audio trouble can never break the
+call. Browsers only allow audio after a user gesture; clicking "Start chat"
+already provides one.
+
+Colours and timing live in `frontend/public/page.css` (`.toast`), which is
+served as-is — tweak them without rebuilding. The markup and the chime are in
+`frontend/src/main.jsx` and need `npm run build`.
+
 ## Failure behaviour
 
 | Failure | What the customer experiences |
