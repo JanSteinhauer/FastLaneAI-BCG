@@ -152,6 +152,125 @@ function SentCard({ payload }) {
   );
 }
 
+function DetailCard({ payload }) {
+  return (
+    <div className="detail-card">
+      <div className="detail-head">
+        <div className="detail-id">
+          <span className="detail-title">{payload.title}</span>
+          {payload.where && <span className="detail-where">{payload.where}</span>}
+        </div>
+        <div className="detail-price">
+          <span className="detail-headline">{payload.headline}</span>
+          <span className="detail-note">{payload.headline_note}</span>
+        </div>
+      </div>
+      {payload.flags && payload.flags.length > 0 && (
+        <div className="chips">
+          {payload.flags.map((flag) => (
+            <span className="chip chip--good" key={flag}>
+              {flag}
+            </span>
+          ))}
+        </div>
+      )}
+      {payload.specs && payload.specs.length > 0 && (
+        <dl className="spec-grid">
+          {payload.specs.map(([label, value]) => (
+            <div key={label}>
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {payload.equipment && payload.equipment.length > 0 && (
+        <div className="chips">
+          {payload.equipment.map((item) => (
+            <span className="chip" key={item}>
+              {item}
+            </span>
+          ))}
+        </div>
+      )}
+      {payload.description && <p className="detail-desc">{payload.description}</p>}
+    </div>
+  );
+}
+
+function VerdictCard({ payload }) {
+  return (
+    <div className={`verdict-card verdict-card--${payload.tone || "flat"}`}>
+      <div className="verdict-head">
+        <span className="verdict-headline">{payload.headline}</span>
+        <span className="verdict-text">{payload.verdict}</span>
+      </div>
+      {payload.rows && payload.rows.length > 0 && (
+        <table className="quote-rows">
+          <tbody>
+            {payload.rows.map(([label, value]) => (
+              <tr key={label}>
+                <td>{label}</td>
+                <td>{value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+// Turns any unrecognised payload into readable rows. A customer is looking at
+// this screen, so an unknown shape degrades into labelled values — never into
+// a JSON dump.
+function humanize(key) {
+  return key
+    .replace(/_/g, " ")
+    .replace(/\beur\b/i, "€")
+    .replace(/^./, (c) => c.toUpperCase());
+}
+
+function renderValue(value) {
+  if (value === null || value === undefined || value === "") return "—";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number") return value.toLocaleString("de-DE");
+  if (Array.isArray(value)) {
+    return value.length
+      ? value.map((v) => (typeof v === "object" ? JSON.stringify(v) : String(v))).join(", ")
+      : "—";
+  }
+  if (typeof value === "object") {
+    return Object.entries(value)
+      .map(([k, v]) => `${humanize(k)}: ${renderValue(v)}`)
+      .join(" · ");
+  }
+  return String(value);
+}
+
+function FallbackCard({ payload }) {
+  const rows = Object.entries(payload).filter(([key]) => key !== "type");
+  return (
+    <div className="kv-card">
+      <div className="kv-head">{humanize(payload.type || "Result")}</div>
+      {rows.length === 0 ? (
+        <p className="kv-empty">Nothing to show.</p>
+      ) : (
+        <table className="quote-rows">
+          <tbody>
+            {rows.map(([key, value]) => (
+              <tr key={key}>
+                <td>{humanize(key)}</td>
+                <td>{renderValue(value)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
 function ToolPanel({ payload }) {
   if (!payload) return null;
   if (payload.type === "cars" && Array.isArray(payload.cars)) {
@@ -163,6 +282,20 @@ function ToolPanel({ payload }) {
             <CarCard car={car} key={car.ref || i} />
           ))}
         </div>
+      </div>
+    );
+  }
+  if (payload.type === "detail") {
+    return (
+      <div className="panel">
+        <DetailCard payload={payload} />
+      </div>
+    );
+  }
+  if (payload.type === "verdict") {
+    return (
+      <div className="panel">
+        <VerdictCard payload={payload} />
       </div>
     );
   }
@@ -187,10 +320,9 @@ function ToolPanel({ payload }) {
       </div>
     );
   }
-  // Unknown payload shape — show it raw so custom tools still get feedback.
   return (
     <div className="panel">
-      <div className="bubble">{JSON.stringify(payload, null, 2)}</div>
+      <FallbackCard payload={payload} />
     </div>
   );
 }

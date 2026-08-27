@@ -57,6 +57,25 @@ across, so the new persona infers everything from the conversation.
   update `MCP_URL` in `.env` and restart the agent.
 - When things get weird: restart 1 → 2 → 3, reload the page, fresh chat.
 
+## What the customer sees
+
+Every tool result is a card. The payload types (`src/used_car_advisor/ui.py`,
+rendered by `frontend/src/main.jsx`):
+
+| Payload | Card |
+|---|---|
+| `cars` | The shortlist, monthly rate first |
+| `detail` | One car in full: price, condition chips, spec grid, equipment, the scrubbed seller text |
+| `verdict` | The price check — the delta, then the evidence behind it |
+| `quote` | The leasing agreement |
+| `sent` | Email confirmation (plus the toast, below) |
+| `text` | A plain bubble, for one-line asides |
+
+Anything unrecognised falls through to a labelled key/value card — snake_case
+turned into words, numbers localised, booleans as Yes/No. **Nothing on this page
+is ever a JSON dump.** A new tool therefore renders as something readable on the
+day you write it, and you add a bespoke card only when it earns one.
+
 ## The email toast
 
 A successful `email_offer` pushes `{"type": "sent", ...}` on the "ui" channel.

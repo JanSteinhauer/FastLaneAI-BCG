@@ -134,7 +134,7 @@ async def show_car(context: RunContext_T, ref: str) -> Any:
     result = await _call(context, "car_details", {"ref": ref})
     if isinstance(result, str):
         return result
-    await ui.push(context, ui.cars_payload([{**result, "monthly_rate_eur": None}]))
+    await ui.push(context, ui.detail_payload(result))
     return result
 
 
@@ -148,7 +148,7 @@ async def check_price(context: RunContext_T, ref: str) -> Any:
     result = await _call(context, "price_check", {"ref": ref})
     if isinstance(result, str):
         return result
-    await ui.push(context, ui.text_payload(str(result.get("verdict", ""))))
+    await ui.push(context, ui.verdict_payload(result))
     return result
 
 

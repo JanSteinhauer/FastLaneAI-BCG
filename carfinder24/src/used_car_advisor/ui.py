@@ -7,10 +7,16 @@ sent email — also pushes a card to the web page over the LiveKit data channel
 
 Payload shapes understood by frontend/src/main.jsx:
 
-    {"type": "cars",  "cars": [...]}    listing cards
-    {"type": "quote", ...}              the leasing agreement card
-    {"type": "sent",  ...}              email confirmation
-    {"type": "text",  "text": "..."}    a plain bubble
+    {"type": "cars",    "cars": [...]}  listing cards
+    {"type": "detail",  ...}            one car's full spec
+    {"type": "verdict", ...}            the price check
+    {"type": "quote",   ...}            the leasing agreement card
+    {"type": "sent",    ...}            email confirmation
+    {"type": "text",    "text": "..."}  a plain bubble
+
+Anything else is rendered as a labelled card, never as raw JSON — the page is
+in front of a customer, so an unrecognised payload has to degrade into
+something readable rather than into a debug dump.
 
 Drawing is best-effort: if the page is gone, the conversation continues.
 """
@@ -101,6 +107,88 @@ def quote_payload(quote: dict[str, Any]) -> dict:
             ["Total over term", _eur(quote.get("total_cost_eur"))],
         ],
         "footnote": "Indicative offer · incl. VAT · not a credit agreement",
+    }
+
+
+def _km(value: Any) -> str | None:
+    return f"{value:,} km".replace(",", " ") if isinstance(value, (int, float)) else None
+
+
+def detail_payload(car: dict[str, Any]) -> dict:
+    """One car's full specification — what the customer asked to hear about.
+
+    Values are formatted here rather than in the browser, so the page stays a
+    dumb renderer and the wording matches what the advisor says out loud.
+    """
+    specs: list[list[str]] = []
+
+    def spec(label: str, value: Any, suffix: str = "") -> None:
+        if value is None or value == "":
+            return
+        text = f"{value:,}".replace(",", " ") if isinstance(value, int) else str(value)
+        specs.append([label, f"{text}{suffix}"])
+
+    # str(): a year is a label, not a quantity — "2021", never "2 021".
+    spec("Registered", str(car["year"]) if car.get("year") else None)
+    spec("Mileage", _km(car.get("mileage_km")))
+    spec("Power", car.get("power_hp"), " hp")
+    spec("Fuel", car.get("fuel"))
+    spec("Transmission", car.get("transmission"))
+    spec("Drive", car.get("drive_train"))
+    spec("Body", car.get("body_type"))
+    spec("Seats", car.get("seats"))
+    spec("Doors", car.get("doors"))
+    spec("Colour", car.get("body_color"))
+    spec("Consumption", car.get("consumption_l_100km"), " l/100 km")
+    spec("CO\u2082", car.get("co2_g_km"), " g/km")
+    spec("Electric range", _km(car.get("electric_range_km")))
+    spec("Previous owners", car.get("previous_owners"))
+
+    flags = [
+        label
+        for label, ok in (
+            ("Accident-free", car.get("had_accident") is False),
+            ("Full service history", bool(car.get("full_service_history"))),
+            ("Non-smoking", bool(car.get("non_smoking"))),
+        )
+        if ok
+    ]
+
+    return {
+        "type": "detail",
+        "title": car.get("title", ""),
+        "headline": _eur(car.get("price_eur")),
+        "headline_note": "listing price",
+        "where": " \u00b7 ".join(
+            x for x in (car.get("city"), car.get("seller")) if x
+        ),
+        "specs": specs,
+        "flags": flags,
+        "equipment": [e for e in (car.get("equipment") or []) if e][:8],
+        "description": car.get("seller_description") or "",
+    }
+
+
+def verdict_payload(result: dict[str, Any]) -> dict:
+    """The price check — evidence, not an opinion."""
+    delta = result.get("difference_pct")
+    rows = []
+    if result.get("median_price_eur"):
+        rows = [
+            ["This car", _eur(result.get("price_eur"))],
+            ["Median of comparables", _eur(result.get("median_price_eur"))],
+            ["Comparable listings", str(result.get("comparables", 0))],
+        ]
+    return {
+        "type": "verdict",
+        "headline": f"{delta:+.1f}%" if isinstance(delta, (int, float)) else "\u2014",
+        "tone": (
+            "good" if isinstance(delta, (int, float)) and delta <= -5
+            else "warn" if isinstance(delta, (int, float)) and delta >= 5
+            else "flat"
+        ),
+        "verdict": result.get("verdict", ""),
+        "rows": rows,
     }
 
 
