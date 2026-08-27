@@ -128,10 +128,13 @@ function CarTypeFilterPanel({ active }) {
 
 function fmtEur(value, decimals = 0) {
   if (value === null || value === undefined) return "—";
-  return `€${value.toLocaleString("de-DE", {
+  // en-GB grouping, then the narrow no-break space the rest of the product
+  // groups numbers with — de-DE renders 12 100 as "12.100", which an English
+  // reader parses as a decimal point.
+  return `€${value.toLocaleString("en-GB", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
-  })}`;
+  }).replace(/,/g, " ")}`;
 }
 
 // The min/med/max market-position bar inside OfferCard's price panel — only
@@ -300,7 +303,11 @@ function OfferCard({ payload }) {
             </div>
             <div>
               <dt>Mileage</dt>
-              <dd>{mileage_km != null ? `${mileage_km.toLocaleString("de-DE")} km` : "—"}</dd>
+              <dd>
+                {mileage_km != null
+                  ? `${mileage_km.toLocaleString("en-GB").replace(/,/g, " ")} km`
+                  : "—"}
+              </dd>
             </div>
           </dl>
 
@@ -418,8 +425,11 @@ function CarCard({ car }) {
         <span className="meta">
           {[
             car.year,
+            // en-GB, then the narrow no-break space the rest of the product
+            // groups numbers with. de-DE rendered 64 000 as "64.000", which an
+            // English reader parses as a decimal point.
             car.mileage_km != null
-              ? `${car.mileage_km.toLocaleString("de-DE")} km`
+              ? `${car.mileage_km.toLocaleString("en-GB").replace(/,/g, " ")} km`
               : null,
             car.fuel,
           ]

@@ -8,14 +8,26 @@ How the agent is put together, and how to change it without breaking the demo.
 src/used_car_advisor/
   agent.py       personas, the realtime model, the avatar, the entrypoint
   prompts.py     the advisor's instructions
-  tools.py       the five voice-facing tools (thin wrappers over MCP)
+  tools.py       the nine voice-facing tools (thin wrappers over MCP)
   mcp_client.py  one persistent MCP session, with reconnect
   ui.py          what gets drawn on the web page
-  state.py       session plumbing (room, personas, tool client)
+  state.py       session plumbing + the Consultation record
   identity.py    this laptop's agent name — do not touch
 src/cars_mcp/
   server.py      the tools themselves
+  advice.py      use case -> car profile, the rules behind advise_car_type
+  partners.py    which dealers have an agreement with us, and what we may say
   guards.py      input/output sanitising
+src/cars_leasing/
+  model.py       the rate, and what a customer is allowed to choose
+  explain.py     how the rate was calculated, built from the same constants
+  sql.py         the model compiled to DuckDB macros, for ranking in SQL
+src/cars_deal/
+  quality.py     peer groups and the 0.0-5.0 deal score
+src/cars_mailer/
+  mailer.py      SES, with attachments
+  offer.py       the offer email (HTML)
+  agreement.py   the draft leasing agreement (PDF)
 ```
 
 A **persona** is a prompt + a voice + a colour + a set of tools. One is
@@ -33,7 +45,11 @@ so the model never sees a tool it cannot use.
    arguments mean, what to do with the answer. That text is the only
    instruction the model gets at call time.
 3. Add a wrapper in `src/used_car_advisor/tools.py` (call, draw, return) and
-   list it in `ADVISOR_TOOLS`.
+   list it in `ADVISOR_TOOLS`. If the tool takes a term or a mileage tier, run
+   `_check_choices` first — refusing a bucket we do not offer is the wrapper's
+   job, not the model's.
+   If the customer states something in the call, record it on
+   `context.userdata.consultation` so the closing summary can use it.
 4. Restart the tool server, then the agent. Start a fresh chat.
 
 If you want the model to reach a tool *unmediated* instead, put its name in the

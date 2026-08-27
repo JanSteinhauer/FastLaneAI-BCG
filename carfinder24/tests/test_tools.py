@@ -90,3 +90,58 @@ def test_car_details_never_returns_raw_seller_text() -> None:
 def test_vocabulary_maps_customer_words() -> None:
     assert clean_enum("SUV", BODY_TYPES, "body_type") == ("Off-Road/Pick-up",)
     assert clean_text("  BMW%_  ") == "BMW"
+
+
+def test_the_advisor_can_actually_state_a_range() -> None:
+    """The model can only pass what the wrapper exposes — the original bug was
+    that the floor existed in the tool but not in the signature the model sees."""
+    import inspect
+
+    from used_car_advisor.tools import find_cars
+
+    params = set(inspect.signature(find_cars).parameters)
+    assert {"min_monthly_rate", "max_monthly_rate", "min_price", "max_price"} <= params
+    server = set(inspect.signature(search_cars).parameters)
+    assert {"min_monthly_rate", "min_price"} <= server
+
+
+def test_the_range_docstring_tells_the_model_which_phrasing_means_what() -> None:
+    """That docstring is the only instruction the model gets at call time."""
+    from used_car_advisor.tools import find_cars
+
+    # info.description is exactly what the model is handed at call time.
+    doc = find_cars.info.description or ""
+    assert "min_monthly_rate=800" in doc  # the worked example
+    assert "no floor" in doc
+
+
+# --- one product, one language ----------------------------------------------
+
+
+GERMAN_DISPLAY_WORDS = (
+    "Kilometerleasing", "Leasingvertrag", "Entwurf", "Sonderzahlung",
+    "Kein Vergleich", "Sehr guter Preis", "Guter Preis", "Fairer Preis",
+    "Erhöhter Preis", "Hoher Preis", "de-DE",
+)
+
+
+def test_nothing_the_customer_sees_is_written_in_german() -> None:
+    """Product text is English. The listings are German market data — their
+    titles and seller prose are not ours to translate — but every label,
+    rating, quote, document and filename we write is."""
+    from pathlib import Path
+
+    from cars_leasing.explain import explain_leasing
+    from cars_leasing.model import leasing_options
+    from cars_mailer.agreement import agreement_filename
+
+    surfaces = [
+        str(leasing_options(20_000)),
+        str(explain_leasing(None)),
+        agreement_filename("CF24-ABC123"),
+        str(search_cars(max_monthly_rate=400, limit=3)),
+        Path("frontend/dist/app.js").read_text(encoding="utf-8", errors="ignore"),
+    ]
+    for word in GERMAN_DISPLAY_WORDS:
+        for surface in surfaces:
+            assert word not in surface, f"{word!r} still reaches the customer"
