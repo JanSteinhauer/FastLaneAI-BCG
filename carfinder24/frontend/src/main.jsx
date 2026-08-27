@@ -30,32 +30,98 @@ function BrandHeader({ live = false }) {
   );
 }
 
-// Renders whatever an agent tool pushed via push_to_frontend() (topic "ui").
+// Renders whatever an agent tool pushed via used_car_advisor.ui.push (topic "ui").
+// Payload shapes: cars | quote | sent | text — see src/used_car_advisor/ui.py.
+function CarCard({ car }) {
+  return (
+    <div className="car-card">
+      {car.image && <img src={car.image} alt="" />}
+      <div className="body">
+        <span className="title">{car.title}</span>
+        {car.price && <span className="price">{car.price}</span>}
+        {car.sub && <span className="sub">{car.sub}</span>}
+        <span className="meta">
+          {[
+            car.year,
+            car.mileage_km != null
+              ? `${car.mileage_km.toLocaleString("de-DE")} km`
+              : null,
+            car.fuel,
+          ]
+            .filter(Boolean)
+            .join(" \u00b7 ")}
+        </span>
+        {car.meta2 && <span className="meta">{car.meta2}</span>}
+      </div>
+    </div>
+  );
+}
+
+function QuoteCard({ payload }) {
+  return (
+    <div className="quote-card">
+      <div className="quote-head">
+        <span className="quote-title">{payload.title}</span>
+        <span className="quote-headline">{payload.headline}</span>
+        <span className="quote-note">{payload.headline_note}</span>
+      </div>
+      <table className="quote-rows">
+        <tbody>
+          {(payload.rows || []).map(([label, value], i) => (
+            <tr key={i}>
+              <td>{label}</td>
+              <td>{value}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {payload.footnote && <div className="quote-foot">{payload.footnote}</div>}
+    </div>
+  );
+}
+
+function SentCard({ payload }) {
+  return (
+    <div className="sent-card">
+      <span className="sent-check" aria-hidden="true" />
+      <div>
+        <div className="sent-title">
+          {payload.title} <span className="sent-to">{payload.recipient}</span>
+        </div>
+        <div className="sent-note">{payload.note}</div>
+        {payload.reference && (
+          <div className="sent-ref">Reference {payload.reference}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ToolPanel({ payload }) {
   if (!payload) return null;
   if (payload.type === "cars" && Array.isArray(payload.cars)) {
     return (
-      <div className="panel cars">
-        {payload.cars.map((car, i) => (
-          <div className="car-card" key={i}>
-            {car.image && <img src={car.image} alt="" />}
-            <div className="body">
-              <span className="title">{car.title}</span>
-              {car.price && <span className="price">{car.price}</span>}
-              <span className="meta">
-                {[
-                  car.year,
-                  car.mileage_km != null
-                    ? `${car.mileage_km.toLocaleString("de-DE")} km`
-                    : null,
-                  car.fuel,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </span>
-            </div>
-          </div>
-        ))}
+      <div className="panel">
+        {payload.subtitle && <div className="panel-title">{payload.subtitle}</div>}
+        <div className="cars">
+          {payload.cars.map((car, i) => (
+            <CarCard car={car} key={car.ref || i} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (payload.type === "quote") {
+    return (
+      <div className="panel">
+        <QuoteCard payload={payload} />
+      </div>
+    );
+  }
+  if (payload.type === "sent") {
+    return (
+      <div className="panel">
+        <SentCard payload={payload} />
       </div>
     );
   }

@@ -1,20 +1,27 @@
 from __future__ import annotations
 
-import json
 import logging
 import os
-from dataclasses import dataclass, field
 from typing import Literal, TypeAlias
 
 from dotenv import load_dotenv
-from livekit.agents import JobContext, WorkerOptions, cli, mcp
+from livekit.agents import (
+    JobContext,
+    RoomOutputOptions,
+    WorkerOptions,
+    cli,
+    mcp,
+)
 from livekit.agents.llm import function_tool
-from livekit.agents.voice import Agent, AgentSession, RunContext
+from livekit.agents.voice import Agent, AgentSession
 from livekit.plugins import openai
 from openai.types import realtime as openai_realtime
 
 from used_car_advisor.identity import agent_name
-from used_car_advisor.prompts import WELCOME_PROMPT
+from used_car_advisor.mcp_client import ToolClient
+from used_car_advisor.prompts import ADVISOR_PROMPT
+from used_car_advisor.state import RunContext_T, UserData
+from used_car_advisor.tools import ADVISOR_TOOLS
 
 logger = logging.getLogger("used-car-advisor")
 logger.setLevel(logging.INFO)
@@ -33,40 +40,8 @@ if not MCP_URL:
     )
 
 
-@dataclass
-class UserData:
-    """Shared plumbing for persona transfers — the conversation itself is the
-    only domain state; personas read everything else from the chat context."""
-
-    personas: dict[str, Agent] = field(default_factory=dict)
-    prev_agent: Agent | None = None
-    ctx: JobContext | None = None
-
-
-RunContext_T: TypeAlias = RunContext[UserData]
-
-
-async def push_to_frontend(context: RunContext_T, payload: dict) -> None:
-    """Show content in the web frontend while the agent keeps talking.
-
-    payload: {"type": "cars", "cars": [...]} renders listing cards;
-             {"type": "text", "text": "..."} renders a plain text bubble.
-    Silently does nothing when no frontend is connected.
-    """
-    userdata = context.userdata
-    if userdata.ctx is None or userdata.ctx.room is None:
-        return
-    try:
-        await userdata.ctx.room.local_participant.send_text(
-            json.dumps(payload), topic="ui"
-        )
-    except Exception:
-        # Frontend display is best-effort; never break the voice flow.
-        logger.debug("push_to_frontend failed", exc_info=True)
-
-
 # Keep in sync with the PERSONAS registry below.
-PersonaName: TypeAlias = Literal["welcome"]
+PersonaName: TypeAlias = Literal["advisor"]
 
 
 @function_tool
@@ -94,7 +69,14 @@ async def switch_persona(context: RunContext_T, name: PersonaName) -> Agent | st
 # Personas — an agent is defined by its prompt, voice, and tools. Adding a
 # persona means adding an entry here (plus its name in PersonaName above,
 # and the new persona's name in the `transfers` of whoever may reach it).
+#
+# One persona on purpose: the whole journey (search → advise → quote → email)
+# is one continuous conversation, and every handover costs a turn of latency
+# and a chance to lose the thread. The registry stays because it is the
+# harness — see docs/AGENT_HARNESS.md for when to add a second persona.
 # ---------------------------------------------------------------------------
+
+from dataclasses import dataclass  # noqa: E402  (kept next to the registry it serves)
 
 
 @dataclass(frozen=True)
@@ -108,19 +90,20 @@ class Persona:
     tools: tuple = ()  # extra function tools beyond switch_persona
     # Tools this persona may use from the MCP server — list the names of the
     # tools you write in cars_mcp/server.py to give this persona access.
+    # This advisor calls MCP through used_car_advisor.tools instead, so it can
+    # draw results on the web page; leave empty unless you want the model to
+    # talk to the tool server unmediated.
     mcp_tools: tuple[str, ...] = ()
 
 
 PERSONAS: dict[str, Persona] = {
-    "welcome": Persona(
-        prompt=WELCOME_PROMPT,
+    "advisor": Persona(
+        prompt=ADVISOR_PROMPT,
         # `cedar` is a warm, masculine voice; other gpt-realtime voices
         # include marin, sage, alloy, ash, ballad, coral, echo, shimmer, verse.
         voice="cedar",
         color="#00E0B5",  # bright teal
-        # A tool you add in cars_mcp/server.py is NOT picked up automatically:
-        # list its name here to let this persona use it.
-        mcp_tools=(),
+        tools=ADVISOR_TOOLS,
     ),
 }
 
@@ -154,7 +137,11 @@ class PersonaAgent(Agent):
     def __init__(self, name: str, persona: Persona) -> None:
         self.persona = persona
         self._label = f"{name.title()}Agent"  # shown by the web frontend
-        tools = [switch_persona, *persona.tools]
+        # switch_persona only exists for personas that can actually transfer —
+        # a tool the model can never use successfully is a tool it can misfire.
+        tools = [*persona.tools]
+        if persona.transfers:
+            tools.insert(0, switch_persona)
         if persona.mcp_tools:
             # The data tools live in the standalone MCP server; each persona
             # sees only the tools it needs. If the server isn't running, the
@@ -191,6 +178,34 @@ class PersonaAgent(Agent):
         self.session.generate_reply()
 
 
+async def _start_avatar(session: AgentSession, ctx: JobContext, persona_key: str) -> bool:
+    """Cherry on top: give the advisor a face (Tavus), if configured.
+
+    Off unless USE_AVATAR is set. Failure is never fatal — a broken avatar must
+    not cost the demo its voice, so we fall back to audio-only and say so in
+    the log. The participant identity matches what the frontend looks for.
+    """
+    from livekit.plugins import tavus  # imported lazily: optional dependency path
+
+    replica_id = os.getenv("TAVUS_REPLICA_ID") or "rf4703150052"  # stock replica "Charlie"
+    persona_id = os.getenv("TAVUS_PERSONA_ID") or None
+    kwargs: dict[str, object] = {
+        "replica_id": replica_id,
+        "avatar_participant_identity": f"tavus-avatar-{persona_key}",
+        "avatar_participant_name": "CarFinder24 Advisor",
+    }
+    if persona_id:
+        kwargs["persona_id"] = persona_id
+    try:
+        avatar = tavus.AvatarSession(**kwargs)  # type: ignore[arg-type]
+        await avatar.start(session, room=ctx.room)
+        logger.info("Tavus avatar started (replica %s)", replica_id)
+        return True
+    except Exception:
+        logger.exception("Tavus avatar failed to start — continuing audio-only")
+        return False
+
+
 async def entrypoint(ctx: JobContext) -> None:
     # Connect to the LiveKit room BEFORE starting the session — without this
     # the agent has no audio track to publish into and the caller hears silence.
@@ -201,9 +216,28 @@ async def entrypoint(ctx: JobContext) -> None:
         {name: PersonaAgent(name, persona) for name, persona in PERSONAS.items()}
     )
 
+    # Open the tool session while the visitor is still saying hello, so the
+    # first search does not pay for the handshake.
+    userdata.tools = ToolClient(MCP_URL)
+    try:
+        await userdata.tools.connect()
+    except Exception:
+        logger.exception("MCP tool server unreachable at %s — tools will retry", MCP_URL)
+    ctx.add_shutdown_callback(userdata.tools.aclose)
+
     session = AgentSession[UserData](userdata=userdata)
 
-    await session.start(agent=userdata.personas["welcome"], room=ctx.room)
+    avatar_on = False
+    if os.getenv("USE_AVATAR", "").strip().lower() in {"1", "true", "yes", "on"}:
+        avatar_on = await _start_avatar(session, ctx, "advisor")
+
+    await session.start(
+        agent=userdata.personas["advisor"],
+        room=ctx.room,
+        # With an avatar, audio is published by the avatar worker (lip-synced);
+        # publishing it twice would double the voice.
+        room_output_options=RoomOutputOptions(audio_enabled=not avatar_on),
+    )
 
 
 def main() -> None:

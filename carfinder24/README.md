@@ -15,6 +15,34 @@ yet — I only got the foundation done. Making it actually useful is yours
 now. What I can give you is a quick start and the notes I wish someone had
 given me.
 
+## What it does now — team Fast Lane AI
+
+The advisor is built. A visitor talks to it, and it:
+
+1. asks what they want to spend **per month** and searches 45,611 real listings
+   by *monthly leasing rate* — not by sticker price;
+2. shows the shortlist on their screen while it talks;
+3. looks a car up in detail and checks its price against comparable listings;
+4. quotes the exact, bindable leasing rate with the full breakdown;
+5. emails the car summary and the leasing agreement, on their say-so.
+
+Read `docs/` before changing anything:
+
+| Doc | What's in it |
+|---|---|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | The three processes, the five tools, and the two design decisions worth defending |
+| [docs/AGENT_HARNESS.md](docs/AGENT_HARNESS.md) | How to add a tool or a persona, the restart rules, failure behaviour, the Tavus avatar |
+| [docs/SECURITY.md](docs/SECURITY.md) | Threat model: conversation injection, injection through listing data, outbound abuse, false statements |
+| [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) | The rehearsed live demo, line by line |
+
+`uv run pytest tests -q` — 29 tests, including the parity check that stops the
+SQL and Python leasing models from ever disagreeing.
+
+Two switches in `.env`: `USE_AVATAR=1` gives the advisor a Tavus face,
+`DEMO_INJECTION=1` plants the hostile listing used in the security demo.
+
+---
+
 ## Getting it running (~10 minutes)
 
 Grab the project folder. Then, in a terminal inside the folder: `uv sync`.

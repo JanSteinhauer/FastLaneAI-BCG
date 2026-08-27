@@ -17,3 +17,6 @@ node_modules/
 # Editors / OS
 .idea/
 .DS_Store
+
+# Frontend build deps (bundle in frontend/dist/ is committed on purpose)
+frontend/node_modules/
