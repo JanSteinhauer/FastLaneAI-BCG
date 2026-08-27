@@ -36,6 +36,7 @@ Read `docs/` before changing anything:
 | [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) | The rehearsed live demo, line by line |
 | [docs/PITCH.md](docs/PITCH.md) | The five-minute pitch: beats, timings, the words |
 | [docs/ROLES.md](docs/ROLES.md) | Who does what now that the code is frozen |
+| [docs/BRANDS.md](docs/BRANDS.md) | All 25 brands with leasable counts and rates — which ones are safe to name on stage |
 | [docs/TAVUS_REPLICAS.md](docs/TAVUS_REPLICAS.md) | Every avatar face on the account — 90 stock, 5 custom — with IDs and thumbnails |
 | [docs/pitch-deck.html](docs/pitch-deck.html) | The deck itself — arrow keys, `N` for speaker notes, `T` for the rehearsal timer |
 
