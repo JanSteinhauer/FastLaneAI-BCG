@@ -35,11 +35,11 @@ MIN_PEERS = 5
 
 #: score threshold -> (German label, English gloss). Checked top down.
 LABELS: tuple[tuple[float, str, str], ...] = (
-    (4.0, "Sehr guter Preis", "very good price"),
-    (3.0, "Guter Preis", "good price"),
-    (2.0, "Fairer Preis", "fair price"),
-    (1.0, "Erhöhter Preis", "above the going rate"),
-    (0.0, "Hoher Preis", "expensive for what it is"),
+    (4.0, "Very good price", "very good price"),
+    (3.0, "Good price", "good price"),
+    (2.0, "Fair price", "fair price"),
+    (1.0, "Increased price", "above the going rate"),
+    (0.0, "High price", "expensive for what it is"),
 )
 
 
