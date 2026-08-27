@@ -45,6 +45,24 @@ async def push(context: RunContext_T, payload: dict[str, Any]) -> None:
         logger.debug("push_to_frontend failed", exc_info=True)
 
 
+async def push_progress(context: RunContext_T, payload: dict[str, Any]) -> None:
+    """Update the progress strip.
+
+    Sent on its own topic ("progress") rather than "ui": the strip lives above
+    the conversation and must not replace whatever card the customer is looking
+    at. Best-effort, like every other draw.
+    """
+    userdata = context.userdata
+    if userdata.ctx is None or userdata.ctx.room is None:
+        return
+    try:
+        await userdata.ctx.room.local_participant.send_text(
+            json.dumps(payload), topic="progress"
+        )
+    except Exception:
+        logger.debug("push_progress failed", exc_info=True)
+
+
 def _eur(value: float | int | None, decimals: int = 0) -> str:
     if value is None:
         return "—"

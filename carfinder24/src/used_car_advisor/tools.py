@@ -42,6 +42,26 @@ async def _call(context: RunContext_T, name: str, args: dict[str, Any]) -> Any |
         return f"That did not work: {exc}. Tell the customer briefly and offer an alternative."
 
 
+async def _remember(context: RunContext_T, **values: Any) -> None:
+    """Record what the conversation just established, and redraw the strip.
+
+    Values come from arguments the model already passed and results the tools
+    already returned — the model is never asked to restate anything, which is
+    why this costs no turn and cannot be forgotten. Empty values are dropped so
+    a later call cannot blank a slot the customer already filled.
+    """
+    userdata = context.userdata
+    userdata.criteria.update({k: v for k, v in values.items() if v not in (None, "", False)})
+    client = userdata.tools
+    if client is None:
+        return
+    try:
+        strip = await client.call("describe_criteria", {"criteria": userdata.criteria})
+    except ToolError:
+        return  # the strip is a nicety; never let it cost the conversation
+    await ui.push_progress(context, {"type": "progress", **strip})
+
+
 def _nearest(value: int, options: tuple[int, ...]) -> int:
     """Snap a spoken number ('about forty thousand km') to an allowed tier."""
     return min(options, key=lambda option: abs(option - value))
@@ -116,6 +136,14 @@ async def find_cars(
     )
     if isinstance(result, str):
         return result
+    await _remember(
+        context,
+        max_monthly_rate=max_monthly_rate, max_price=max_price, make=make, model=model,
+        body_type=body_type, fuel=fuel, transmission=transmission, min_seats=min_seats,
+        max_mileage_km=max_mileage_km, min_year=min_year, min_power_hp=min_power_hp,
+        city=city, no_accident=no_accident, term_months=term_months,
+        annual_km=annual_km, down_payment=down_payment,
+    )
     if result.get("cars"):
         await ui.push(context, ui.cars_payload(result["cars"], result.get("terms")))
     else:
@@ -134,6 +162,13 @@ async def show_car(context: RunContext_T, ref: str) -> Any:
     result = await _call(context, "car_details", {"ref": ref})
     if isinstance(result, str):
         return result
+    await _remember(
+        context,
+        car_title=result.get("title"), colour=result.get("body_color"),
+        electric_range_km=result.get("electric_range_km"),
+        fuel=result.get("fuel"), transmission=result.get("transmission"),
+        min_power_hp=result.get("power_hp"),
+    )
     await ui.push(context, ui.detail_payload(result))
     return result
 
@@ -186,6 +221,16 @@ async def quote_leasing(
     if result.get("declined"):
         await ui.push(context, ui.text_payload(str(result["declined"])))
     else:
+        breakdown = result.get("breakdown", {})
+        await _remember(
+            context,
+            car_title=result.get("car"), term_months=result.get("term_months"),
+            annual_km=result.get("annual_km"), down_payment=result.get("down_payment_eur"),
+            monthly_rate_eur=result.get("monthly_rate_eur"),
+            apr_pct=breakdown.get("apr_pct"),
+            residual_value_eur=breakdown.get("residual_value_eur"),
+            total_cost_eur=result.get("total_cost_eur"),
+        )
         await ui.push(context, ui.quote_payload(result))
     return result
 

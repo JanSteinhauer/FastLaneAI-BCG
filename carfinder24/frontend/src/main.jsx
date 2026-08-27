@@ -271,6 +271,50 @@ function FallbackCard({ payload }) {
   );
 }
 
+// The two phases of the conversation, filled in as the advisor establishes
+// them. Fed by the "progress" topic — see docs/PROGRESS_TRACKER.md.
+function ProgressStrip({ payload }) {
+  if (!payload || !Array.isArray(payload.stages)) return null;
+  return (
+    <div className="progress">
+      {payload.stages.map((stage) => {
+        const pct = stage.total ? Math.round((stage.filled / stage.total) * 100) : 0;
+        const active = payload.active === stage.key;
+        return (
+          <section
+            className={active ? "stage stage--active" : "stage"}
+            key={stage.key}
+            aria-label={`${stage.title}: ${stage.filled} of ${stage.total} established`}
+          >
+            <header className="stage-head">
+              <span className="stage-title">{stage.title}</span>
+              <span className="stage-count">
+                {stage.filled}/{stage.total}
+              </span>
+            </header>
+            <div className="stage-bar">
+              <span className="stage-fill" style={{ width: `${pct}%` }} />
+            </div>
+            <div className="stage-slots">
+              {stage.slots.map((slot) => (
+                <span
+                  className={slot.filled ? "slot slot--filled" : "slot"}
+                  key={slot.label}
+                  title={slot.label}
+                >
+                  <span className="slot-label">{slot.label}</span>
+                  {slot.filled && <span className="slot-value">{slot.value}</span>}
+                </span>
+              ))}
+            </div>
+          </section>
+        );
+      })}
+      {payload.car && <div className="progress-car">{payload.car}</div>}
+    </div>
+  );
+}
+
 function ToolPanel({ payload }) {
   if (!payload) return null;
   if (payload.type === "cars" && Array.isArray(payload.cars)) {
@@ -341,6 +385,7 @@ function Chat() {
   const room = useRoomContext();
   const [payload, setPayload] = useState(null);
   const [toast, setToast] = useState(null);
+  const [progress, setProgress] = useState(null);
   const persona = agentAttributes?.agent;
   const auraColor = agentAttributes?.agent_color || DEFAULT_AURA_COLOR;
 
@@ -411,11 +456,25 @@ function Chat() {
         playSentChime();
       }
     });
-    return () => room.unregisterTextStreamHandler("ui");
+    // Its own topic, so the strip updates without disturbing the card the
+    // customer is looking at.
+    room.registerTextStreamHandler("progress", async (reader) => {
+      const text = await reader.readAll();
+      try {
+        setProgress(JSON.parse(text));
+      } catch {
+        /* ignore a malformed update rather than blanking the strip */
+      }
+    });
+    return () => {
+      room.unregisterTextStreamHandler("ui");
+      room.unregisterTextStreamHandler("progress");
+    };
   }, [room]);
 
   return (
     <>
+      <ProgressStrip payload={progress} />
       <div className="aura-stage">{stage}</div>
       <p className="status">
         {state}

@@ -23,6 +23,10 @@ class UserData:
     prev_agent: Agent | None = None
     ctx: JobContext | None = None
     tools: "ToolClient | None" = None  # connection to the MCP tool server
+    # Everything the conversation has established, accumulated from the
+    # arguments the model passes and the numbers the tools return. Drawn as the
+    # progress strip at the top of the page — see docs/PROGRESS_TRACKER.md.
+    criteria: dict = field(default_factory=dict)
 
 
 RunContext_T: TypeAlias = RunContext[UserData]

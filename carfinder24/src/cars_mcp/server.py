@@ -48,6 +48,7 @@ from cars_leasing.model import NotLeasable, compute_quote
 from cars_leasing.sql import macro_ddl
 from cars_mailer.mailer import EmailNotConfigured, send_email
 from cars_mailer.offer import offer_email_html, offer_reference
+from cars_mcp.criteria import describe
 from cars_mcp.guards import clean_enum, clean_text, looks_injected, safe_snippet
 
 load_dotenv()  # tool credentials, e.g. the email settings for cars_mailer/mailer.py
@@ -318,6 +319,23 @@ def search_cars(
                   "down_payment": params["down"]},
         "cars": [_card(r) for r in rows],
     }
+
+
+@mcp.tool
+def describe_criteria(criteria: dict) -> dict:
+    """Render what the conversation has established as two fillable stages.
+
+    Takes the criteria gathered so far — the arguments already passed to the
+    other tools, plus the numbers they returned — and returns "the car" and
+    "the leasing", each with labelled slots marked filled or still open. The
+    web page draws it as a progress strip.
+
+    The advisor does not need to call this: the harness calls it after every
+    tool so the screen keeps up with the conversation by itself. It is a tool
+    rather than private code so the slot vocabulary lives with the data that
+    defines it — see docs/PROGRESS_TRACKER.md.
+    """
+    return describe(criteria or {})
 
 
 @mcp.tool
