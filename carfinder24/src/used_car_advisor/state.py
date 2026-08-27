@@ -74,6 +74,11 @@ class UserData:
     ctx: JobContext | None = None
     tools: ToolClient | None = None  # connection to the MCP tool server
     consultation: Consultation = field(default_factory=Consultation)
+    # The last set of search_cars filters actually in effect, so a follow-up
+    # search ("show me something cheaper") keeps SUV/diesel/etc. without the
+    # model having to re-state every earlier filter from memory. Merged, not
+    # replaced, in used_car_advisor.tools.find_cars.
+    last_filters: dict[str, Any] = field(default_factory=dict)
 
 
 RunContext_T: TypeAlias = RunContext[UserData]

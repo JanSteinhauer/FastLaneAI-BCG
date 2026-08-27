@@ -245,6 +245,7 @@ def _card(row: dict[str, Any], deal: DealScore | None = None) -> dict[str, Any]:
     """One listing, compact — the shape both the model and the UI consume."""
     card = {
         "ref": _ref(row["id"]),
+        "make": row.get("make"),
         "title": _title(row),
         "year": _year(row),
         "price_eur": row["price"],
@@ -257,6 +258,8 @@ def _card(row: dict[str, Any], deal: DealScore | None = None) -> dict[str, Any]:
         "body_color": row.get("body_color"),
         "city": row.get("city"),
         "seller": clean_text(row.get("seller_company_name"), 40),
+        "ratings_average": row.get("ratings_average"),
+        "ratings_count": row.get("ratings_count"),
         "partner_dealer": bool(row.get("is_partner")),
     }
     if deal is not None:
@@ -673,6 +676,7 @@ def car_details(ref: str) -> dict:
     ]
     return {
         **_card(row | {"monthly_rate": None}, _deal(row)),
+        "model": clean_text(row.get("model"), 40),
         "seats": row.get("nr_seats"),
         "doors": row.get("nr_doors"),
         "upholstery": row.get("upholstery"),

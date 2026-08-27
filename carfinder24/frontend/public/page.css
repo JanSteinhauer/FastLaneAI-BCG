@@ -714,3 +714,847 @@ body::before {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
+
+/* --- Car glyphs: shared by CarTypeFilterPanel and OfferCard (main.jsx) ----
+   --car-color is registered so the browser can animate the property itself
+   (not just cross-fade a swapped value) when the filter panel's active icon
+   changes — that's what makes the recolor on selection look intentional
+   instead of a hard cut. */
+
+@property --car-color {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #5a5a5f;
+}
+
+.car-glyph {
+  --car-color: #5a5a5f;
+  width: 100%;
+  height: 100%;
+  display: block;
+  transition: --car-color 420ms ease, transform 200ms ease;
+}
+
+.car-glyph .glyph-ground { fill: rgb(0 0 0 / 0.30); }
+.car-glyph .glyph-wheel { fill: #16171a; }
+.car-glyph .glyph-hub { fill: #45454b; }
+.car-glyph .glyph-rim {
+  fill: none;
+  stroke: rgb(255 255 255 / 0.22);
+  stroke-width: 1.4;
+}
+.car-glyph .glyph-body {
+  fill: var(--car-color);
+  stroke: rgb(0 0 0 / 0.25);
+  stroke-width: 1;
+  filter: drop-shadow(0 3px 2px rgb(0 0 0 / 0.35));
+}
+.car-glyph.no-color .glyph-body {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.6;
+  stroke-dasharray: 4 3;
+  filter: none;
+}
+.car-glyph.is-active { transform: scale(1.06); }
+
+@media (prefers-reduced-motion: reduce) {
+  .car-glyph { transition: none; }
+}
+
+/* --- CarTypeFilterPanel: the live "what is the advisor searching for" strip.
+   Every body type is always shown — only the matching icon recolors — so the
+   customer sees the full vocabulary the advisor understands, not just
+   whichever one is currently active. */
+
+.filter-panel {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+@media (max-width: 600px) {
+  .filter-panel { grid-template-columns: repeat(4, 1fr); }
+}
+
+.filter-chip-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px 6px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  transition: border-color 250ms ease, background-color 250ms ease;
+}
+
+.filter-chip-icon .car-glyph {
+  width: 40px;
+  height: 22px;
+}
+
+.filter-chip-label {
+  font-size: 0.64rem;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+  transition: color 250ms ease;
+}
+
+.filter-chip-icon.is-active {
+  background: rgb(0 224 181 / 0.08);
+  border-color: rgb(0 224 181 / 0.28);
+}
+
+.filter-chip-icon.is-active .filter-chip-label {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* --- OfferCard: car_details + price_check + leasing_quote fused
+   (used_car_advisor.ui.offer_payload, tools.show_offer). */
+
+.offer-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--color-content-card-soft);
+  border: 1px solid var(--color-content-border);
+  border-radius: 10px;
+  overflow: hidden;
+  padding: 0 0 14px;
+}
+
+.offer-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-content-border);
+}
+
+.make-mark {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-content-card);
+  border: 1px solid var(--color-content-border);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 0.62rem;
+  color: var(--accent);
+}
+
+.make-name { font-size: 0.86rem; font-weight: 600; color: var(--text); }
+.make-sub { font-size: 0.74rem; color: var(--muted); }
+
+.offer-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 16px;
+  padding: 0 16px;
+}
+
+.offer-columns > div { min-width: 0; }
+
+@media (max-width: 560px) {
+  .offer-columns { grid-template-columns: 1fr; }
+}
+
+.offer-stage {
+  position: relative;
+  width: 100%;
+  height: 120px;
+  border-radius: 8px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 28% 18%, rgb(0 224 181 / 0.10), transparent 60%),
+    radial-gradient(circle at 80% 88%, rgb(73 40 255 / 0.12), transparent 65%),
+    #303035;
+}
+
+.offer-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.035) 1px, transparent 1px);
+  background-size: 18px 18px;
+  mask-image: radial-gradient(ellipse at 50% 62%, black 40%, transparent 78%);
+}
+
+.offer-stage .car-glyph { position: relative; }
+
+.stage-tag {
+  position: absolute;
+  left: 9px;
+  bottom: 7px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: rgb(244 244 245 / 0.55);
+}
+
+.offer-title-block {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.offer-title {
+  font-size: 0.94rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.offer-spec { font-size: 0.78rem; color: var(--muted); }
+
+.offer-seller-row {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.offer-dealer { color: var(--text); font-weight: 500; }
+
+.rating-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text);
+  background: var(--color-content-card);
+  border: 1px solid var(--color-content-border);
+  border-radius: 5px;
+  padding: 2px 6px;
+}
+
+.rating-chip .star { color: var(--accent); }
+
+.fact-chips {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.fact-chip {
+  font-size: 0.7rem;
+  color: var(--muted);
+  background: var(--color-content-card);
+  border: 1px solid var(--color-content-border);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+
+.fact-chip.good { color: var(--accent); border-color: rgb(0 224 181 / 0.3); }
+.fact-chip.na { color: rgb(165 165 169 / 0.7); font-style: italic; }
+
+.price-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--color-content-card);
+  border: 1px solid var(--color-content-border);
+  border-radius: 8px;
+  padding: 13px 15px;
+}
+
+.price-head { display: flex; flex-direction: column; gap: 2px; }
+
+.price-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--accent);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.price-value .unit { font-size: 0.82rem; font-weight: 600; color: var(--muted); margin-left: 3px; }
+.price-vat { font-size: 0.7rem; color: var(--muted); }
+
+.lease-factor {
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text);
+  background: var(--color-content-card-soft);
+  border: 1px solid var(--color-content-border);
+  border-radius: 5px;
+  padding: 3px 7px;
+}
+
+.compare {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid var(--color-content-border);
+  padding-top: 10px;
+}
+
+.verdict-pill {
+  align-self: flex-start;
+  font-size: 0.7rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+
+.verdict-pill--below { color: var(--color-brand-on-primary); background: var(--accent); }
+.verdict-pill--above { color: #241505; background: #e2984f; }
+.verdict-pill--even { color: var(--text); background: var(--color-content-card-soft); }
+
+.price-bar {
+  position: relative;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-content-card-soft);
+  margin: 9px 2px 3px;
+}
+
+.bar-fill { position: absolute; inset: 0; border-radius: 999px; }
+.bar-fill--below { background: linear-gradient(90deg, rgb(0 224 181 / 0.35), rgb(0 224 181 / 0.08)); }
+.bar-fill--above { background: linear-gradient(90deg, rgb(226 152 79 / 0.10), rgb(226 152 79 / 0.4)); }
+.bar-fill--even { background: rgb(255 255 255 / 0.08); }
+
+.bar-tick {
+  position: absolute;
+  top: -4px;
+  width: 1px;
+  height: 14px;
+  background: rgb(255 255 255 / 0.28);
+}
+
+.bar-tick-label {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.bar-marker {
+  position: absolute;
+  top: -5px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--color-content-card);
+  transform: translateX(-50%);
+}
+
+.bar-marker--below { background: var(--accent); }
+.bar-marker--above { background: #e2984f; }
+.bar-marker--even { background: var(--muted); }
+
+.bar-endlabels {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--muted);
+  margin-top: 20px;
+}
+
+.compare-note { font-size: 0.74rem; color: var(--muted); line-height: 1.5; }
+
+.list-price-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-top: 1px solid var(--color-content-border);
+  padding-top: 10px;
+  font-size: 0.82rem;
+}
+
+.list-price-row--plain { border-top: none; padding-top: 0; }
+.list-price-row .k { color: var(--muted); }
+.list-price-row .v { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+
+.lease-details {
+  margin: 0 16px;
+  border-top: 1px solid var(--color-content-border);
+}
+
+.lease-details summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 2px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.lease-details summary::-webkit-details-marker { display: none; }
+
+.lease-details summary .chevron {
+  color: var(--muted);
+  transition: transform 150ms ease;
+  font-size: 0.78rem;
+}
+
+.lease-details[open] summary .chevron { transform: rotate(180deg); }
+
+.lease-groups { display: flex; flex-direction: column; gap: 12px; padding: 2px 2px 4px; }
+
+.lease-group-label {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+
+.lease-rows { display: flex; flex-direction: column; gap: 4px; }
+.lease-row { display: flex; justify-content: space-between; font-size: 0.8rem; }
+.lease-row .k { color: var(--muted); }
+.lease-row .v { color: var(--text); font-variant-numeric: tabular-nums; }
+
+.total-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--color-content-card);
+  border: 1px solid var(--color-content-border);
+  border-radius: 7px;
+  padding: 9px 11px;
+}
+
+.total-box .k { font-size: 0.78rem; color: var(--muted); }
+.total-box .v { font-size: 1rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+
+.per-km-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.76rem;
+  color: var(--muted);
+  padding-top: 1px;
+}
+
+.per-km-row .v { color: var(--text); font-variant-numeric: tabular-nums; }
+
+.offer-footnote {
+  margin: 0;
+  padding: 0 16px;
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+/* --- Brand logo on the offer card ----------------------------------------
+   Sits in the same 26px slot as .make-mark, so a logo and a monogram are
+   interchangeable. The light chip is not decoration: more than half of the
+   files in public/CarLogo/ are black-on-transparent silhouettes (BMW,
+   Mercedes-Benz, Volvo, Honda, VW, Kia, Aston Martin) and would be invisible
+   painted straight onto a dark card. See docs/BRAND_COLOURS.md. */
+
+.make-logo {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f4f6f7;
+  border: 1px solid var(--color-content-border);
+  overflow: hidden;
+}
+
+.make-logo img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  display: block;
+}
+
+/* --- Offer card, wireframe layout ----------------------------------------
+   Header: boxed brand logo | vehicle name on a divider | price-comparison
+   gauge. Body: car silhouette on the left, price and specs on the right.
+   Markup in frontend/src/main.jsx (OfferCard). */
+
+.oc-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--color-content-border);
+}
+
+.oc-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oc-compare {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  cursor: help;
+}
+
+.oc-segs {
+  display: flex;
+  gap: 3px;
+}
+
+.oc-seg {
+  width: 13px;
+  height: 9px;
+  border-radius: 2px;
+  border: 1px solid var(--color-content-border);
+  background: transparent;
+}
+
+.oc-seg--on { border-color: transparent; }
+.oc-seg--on.oc-seg--below { background: var(--accent); }
+.oc-seg--on.oc-seg--even { background: #9fb0bd; }
+.oc-seg--on.oc-seg--above { background: #ffb4ab; }
+.oc-seg--on.oc-seg--none { background: var(--color-content-border); }
+
+.oc-compare-label {
+  font-size: 0.63rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.oc-body {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.85fr) minmax(0, 1.6fr);
+  gap: 16px;
+  padding: 16px;
+}
+
+.oc-visual {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 150px;
+  padding: 14px;
+  border: 1px solid var(--color-content-border);
+  border-radius: 9px;
+  background: var(--color-content-card);
+}
+
+.oc-visual svg { width: 100%; height: auto; }
+
+.oc-visual-tag {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  font-size: 0.63rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.oc-info {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  min-width: 0;
+}
+
+.oc-price {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 11px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.oc-price-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.oc-price-unit {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--muted);
+  margin-left: 5px;
+}
+
+.oc-price-note {
+  font-size: 0.73rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.oc-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0;
+}
+
+.oc-lines > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--color-content-border);
+}
+
+.oc-lines dt {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.oc-lines dd {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oc-specs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.oc-spec {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.oc-tick {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin-top: 2px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  position: relative;
+}
+
+.oc-tick::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 3px;
+  height: 7px;
+  border: solid var(--accent);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+.oc-spec--empty .oc-tick {
+  border-color: var(--color-content-border);
+  background: transparent;
+}
+
+.oc-spec--empty .oc-tick::after { display: none; }
+
+.oc-spec-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.oc-spec-label {
+  font-size: 0.63rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.oc-spec-value {
+  font-size: 0.82rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oc-spec--empty .oc-spec-value { color: var(--muted); font-style: italic; }
+
+.oc-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 16px 14px;
+}
+
+@media (max-width: 560px) {
+  .oc-body { grid-template-columns: 1fr; }
+  .oc-visual { min-height: 110px; }
+  .oc-head { grid-template-columns: auto 1fr; }
+  .oc-compare { grid-column: 1 / -1; align-items: flex-start; }
+  .oc-name { text-align: left; }
+}
+
+/* A car that cannot be leased on the terms asked for: the price tag drops the
+   accent, because there is no offer to highlight yet. */
+.oc-price--plain {
+  border-color: var(--color-content-border);
+  background: var(--color-content-card);
+}
+
+.oc-price--plain .oc-price-value { color: var(--text); }
+
+/* --- Leasing agreement, inline on the offer card -------------------------
+   The rate and the car are one decision, so the breakdown is part of the page
+   rather than an accordion the customer has to think to open. */
+
+.lease-block {
+  border-top: 1px solid var(--color-content-border);
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lease-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.lease-head-terms {
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.lease-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px 22px;
+}
+
+.lease-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lease-group-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.lease-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.lease-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-content-border) 55%, transparent);
+}
+
+.lease-row .v {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.lease-row--sum {
+  border-bottom: 0;
+  padding-top: 6px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.lease-row--sum .v { color: var(--accent); }
+
+.total-box {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 13px;
+  border-radius: 8px;
+  background: var(--color-content-card);
+  border: 1px solid var(--color-content-border);
+  font-size: 0.83rem;
+}
+
+.total-box .k { color: var(--muted); }
+
+.total-box .v {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.lease-blocked {
+  margin: 0;
+  padding: 13px 16px 15px;
+  border-top: 1px solid var(--color-content-border);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--muted);
+}

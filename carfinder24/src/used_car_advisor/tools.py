@@ -51,6 +51,17 @@ logger = logging.getLogger("used-car-advisor.tools")
 TERMS = (12, 24, 36, 48)
 KM_TIERS = (10_000, 15_000, 20_000, 30_000)
 
+# The find_cars arguments that represent a search constraint — carried forward
+# across calls via context.userdata.last_filters (state.py) so "show me
+# something cheaper" doesn't silently drop the SUV/diesel/etc. the customer
+# already gave. term_months/annual_km/down_payment are leasing terms, not
+# filters, and are never merged this way — they're restated every call.
+FILTER_ARGS = (
+    "max_monthly_rate", "max_price", "make", "model", "body_type", "fuel",
+    "transmission", "min_seats", "max_mileage_km", "min_year", "min_power_hp",
+    "city", "no_accident",
+)
+
 
 async def _call(context: RunContext_T, name: str, args: dict[str, Any]) -> Any | str:
     """Run an MCP tool; on failure return the message the advisor should say."""
@@ -257,29 +268,41 @@ async def find_cars(
     if refusal := _check_choices(term_months, annual_km):
         await ui.push(context, ui.text_payload(refusal.split(" Say this")[0]))
         return refusal
+
+    supplied = {
+        "max_monthly_rate": max_monthly_rate,
+        "min_monthly_rate": min_monthly_rate,
+        "max_price": max_price,
+        "min_price": min_price,
+        "make": make,
+        "model": model,
+        "body_type": body_type,
+        "fuel": fuel,
+        "transmission": transmission,
+        "color": color,
+        "min_seats": min_seats,
+        "max_mileage_km": max_mileage_km,
+        "min_year": min_year,
+        "min_power_hp": min_power_hp,
+        "max_previous_owners": max_previous_owners,
+        "city": city,
+        "no_accident": no_accident or None,
+        "full_service_history": full_service_history or None,
+        "mode": mode,
+    }
+    # Layer this call's explicit filters over whatever was already active —
+    # an omitted argument means "unchanged", not "cleared". See UserData.last_filters.
+    filters = {
+        **context.userdata.last_filters,
+        **{k: v for k, v in supplied.items() if v is not None},
+    }
+    context.userdata.last_filters = filters
+
     result = await _call(
         context,
         "search_cars",
         {
-            "max_monthly_rate": max_monthly_rate,
-            "min_monthly_rate": min_monthly_rate,
-            "max_price": max_price,
-            "min_price": min_price,
-            "make": make,
-            "model": model,
-            "body_type": body_type,
-            "fuel": fuel,
-            "transmission": transmission,
-            "color": color,
-            "min_seats": min_seats,
-            "max_mileage_km": max_mileage_km,
-            "min_year": min_year,
-            "min_power_hp": min_power_hp,
-            "max_previous_owners": max_previous_owners,
-            "city": city,
-            "no_accident": no_accident or None,
-            "full_service_history": full_service_history or None,
-            "mode": mode,
+            **filters,
             "term_months": int(term_months),
             "annual_km": int(annual_km),
             "down_payment": int(down_payment),
@@ -287,6 +310,7 @@ async def find_cars(
             "limit": max(1, min(int(limit), 5)),
         },
     )
+    await ui.push(context, ui.filters_payload(filters))
     if isinstance(result, str):
         return result
     context.userdata.consultation.record(
@@ -302,11 +326,64 @@ async def find_cars(
         annual_km=int(annual_km),
         down_payment=int(down_payment) or None,
     )
-    if result.get("cars"):
-        await ui.push(context, ui.cars_payload(result["cars"], result.get("terms")))
+    cars = result.get("cars") or []
+    if len(cars) == 1:
+        # One result is not a shortlist. Show the full card.
+        await _push_one_car(
+            context, cars[0]["ref"], int(term_months), int(annual_km), int(down_payment)
+        )
+    elif cars:
+        await ui.push(context, ui.cars_payload(cars, result.get("terms")))
     else:
         await ui.push(context, ui.text_payload("No matching cars — let's widen the search."))
     return result
+
+
+async def _push_one_car(
+    context: RunContext_T,
+    ref: str,
+    term_months: int = 36,
+    annual_km: int = 15000,
+    down_payment: int = 0,
+) -> Any:
+    """Draw the full offer card for a single car.
+
+    Whenever exactly one car is on screen the customer has stopped comparing
+    and started deciding, so the shortlist tile is the wrong shape: they want
+    the logo, the market comparison, the specs and the rate. This fetches the
+    three things that card needs and pushes them as one payload.
+
+    A car that cannot be leased on these terms still gets the card — with the
+    list price leading and the reason attached — rather than falling back to a
+    tile that would print the price twice.
+    """
+    if refusal := _check_choices(term_months, annual_km):
+        await ui.push(context, ui.text_payload(refusal.split(" Say this")[0]))
+        return refusal
+
+    details = await _call(context, "car_details", {"ref": ref})
+    if isinstance(details, str):
+        return details
+
+    price_check = await _call(context, "price_check", {"ref": ref})
+    if isinstance(price_check, str):
+        price_check = {"comparables": 0}
+
+    quote = await _call(
+        context,
+        "leasing_quote",
+        {
+            "ref": ref,
+            "term_months": int(term_months),
+            "annual_km": int(annual_km),
+            "down_payment": int(down_payment),
+        },
+    )
+    if isinstance(quote, str):
+        quote = {}
+
+    await ui.push(context, ui.offer_payload(details, price_check, quote))
+    return details
 
 
 @function_tool
@@ -317,12 +394,8 @@ async def show_car(context: RunContext_T, ref: str) -> Any:
     owners, consumption, colour. Summarise in one or two sentences; the details
     are on their screen.
     """
-    result = await _call(context, "car_details", {"ref": ref})
-    if isinstance(result, str):
-        return result
     context.userdata.consultation.record(ref=ref)
-    await ui.push(context, ui.cars_payload([{**result, "monthly_rate_eur": None}]))
-    return result
+    return await _push_one_car(context, ref)
 
 
 @function_tool
@@ -408,6 +481,31 @@ async def quote_leasing(
     else:
         await ui.push(context, ui.quote_payload(result))
     return result
+
+
+@function_tool
+async def show_offer(
+    context: RunContext_T,
+    ref: str,
+    term_months: int = 36,
+    annual_km: int = 15000,
+    down_payment: int = 0,
+) -> Any:
+    """Show the customer a full offer for one car: details, market check and rate together.
+
+    Use this instead of quote_leasing when the customer has settled on a car
+    and wants the complete picture — condition, how its price compares to
+    similar listings, and the exact monthly rate with its breakdown — rather
+    than just a number. Summarise in one or two sentences; everything else is
+    on their screen.
+
+    If the car cannot be leased on these terms, say so plainly (the reason is
+    in the answer) and offer a shorter term or a lower mileage tier instead.
+    """
+    context.userdata.consultation.record(ref=ref)
+    return await _push_one_car(
+        context, ref, int(term_months), int(annual_km), int(down_payment)
+    )
 
 
 @function_tool
@@ -533,6 +631,7 @@ ADVISOR_TOOLS = (
     check_price,
     leasing_options,
     quote_leasing,
+    show_offer,
     explain_leasing,
     summarize_choices,
     email_offer,
