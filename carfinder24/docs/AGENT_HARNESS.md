@@ -76,5 +76,23 @@ is `tavus-avatar-<persona>`. With the avatar on, the agent stops publishing its
 own audio (`RoomOutputOptions(audio_enabled=False)`) — the avatar worker
 publishes the lip-synced track, and publishing both would double the voice.
 Override the replica with `TAVUS_REPLICA_ID`; the default is the stock replica
-"Charlie". A failure here can never take the voice down: it is caught, logged,
-and the session continues without a face.
+"Charlie". A failure *at startup* can never take the voice down: it is caught,
+logged, and the session continues without a face.
+
+**Verified**: with `USE_AVATAR=1` the Tavus participant joins as
+`tavus-avatar-advisor` and publishes `avatar_audio` + `avatar_video` about three
+seconds after the agent — which is exactly what `frontend/src/main.jsx` looks
+for. Check it yourself without a browser, a mic or a camera:
+
+```bash
+uv run python scripts/probe_room.py 50
+```
+
+It dispatches the worker the way the web page does and prints who joined and
+what they published. Use it to confirm the stack is alive before rehearsals.
+
+**The trade-off to decide before the demo**: with the avatar on, the *avatar*
+publishes the voice. A Tavus outage at startup degrades gracefully, but one
+mid-session takes the audio with it. Audio-only is the safer demo; the face is
+the better story. `USE_AVATAR` is the switch, and the agent must be restarted
+after flipping it.
