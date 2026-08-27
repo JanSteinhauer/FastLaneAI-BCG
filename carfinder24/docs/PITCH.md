@@ -84,6 +84,13 @@ Anchored in our own data — no invented market numbers.
 - **The payback line**: one additional used-car sale carries $1,253–3,000 of
   front-end gross, which pays for **10,000 to 24,000 conversations**. The
   advisor pays for itself at a lift of 0.01%.
+- **Against a human desk**: qualification costs €2–14 a call today and eats
+  **43% of the revenue it produces**. Ours is **1%**. But the money is not in
+  the cost saving — 56% of leads arrive after hours, dealers miss 35% of calls,
+  and the median first response is 11.5 hours. Per 1,000 people who arrive
+  wanting a car, the advisor contributes **€11,549 against €4,332** — and over
+  half of that gap is revenue the traditional setup never earns, because the
+  conversation never happens.
 - **Be honest about what that is**: eleven cents is running cost, not customer
   acquisition cost — it does not buy the visitor's attention, it converts
   attention the platform already has. Owned-channel leads close at 15–25%

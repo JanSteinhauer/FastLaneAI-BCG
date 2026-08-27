@@ -175,12 +175,107 @@ conversations** — a lift of about **0.01%**. Every conversation after that is
 margin. That is the whole business case, and it does not depend on any number we
 had to invent.
 
+## Us versus a traditional setup
+
+The honest comparison is not "AI is cheaper than a person". It is what each
+setup does to a thousand people who arrive wanting a car.
+
+### What each conversation costs to handle
+
+| | Traditional | CarFinder24 advisor |
+|---|---|---|
+| Who handles it | Salesperson or BDC agent | The advisor |
+| Time per qualification | 6–10 minutes incl. CRM notes | 3 minutes |
+| Cost | **€2–14** per call (BPO per-call $2–15; $0.50–1.75/min; €30–45/hr fully loaded onshore) | **$0.126** |
+| Base case used below | **€5.00** | **€0.12** |
+| Available | Business hours | Always |
+| Concurrency | One conversation per person | Unbounded |
+| Searches 45,611 listings by monthly rate | No — checks a handful by price | 70 ms |
+
+Per interaction that is roughly **40× cheaper**. That number is real, and it is
+also the least interesting one on this page.
+
+### The gap that actually costs money
+
+Published 2026 dealership benchmarks:
+
+- **56%** of leads arrive **outside business hours**
+- Dealerships **miss 35%** of inbound calls — 1 in 3 callers never reaches anyone
+- Hang-up rate reaches **65.9% at 8pm**
+- Median first response time: **11.5 hours**; only **13.2%** respond within 5 minutes
+- **75%** of callers who hit voicemail never call back
+
+So the traditional setup does not merely cost more per conversation. For roughly
+a third of the demand it produces **no conversation at all**, and for the
+after-hours majority it produces one half a day late, by which time the customer
+has been to three other sites.
+
+### How we make money
+
+Three models, all benchmarked. The third is the one our product actually
+performs, and its numbers come from our own leasing model rather than an
+assumption:
+
+| Model | Benchmark | Per contract |
+|---|---|---|
+| Lead fee to the dealer | carwow charges £49 + VAT per enquirer | €15 (conservative, a quarter of carwow) |
+| Success fee on the sale | carwow charges £250–500 | €300 |
+| **Leasing brokerage** | a share of the finance charge | **€324** |
+
+That last line is computed, not guessed. For the segment we serve — cars leasing
+under €300 a month, median price €19,820 — our own model says the lessor
+collects **€3,244 of finance charge** over a 36-month contract. A 10% brokerage
+take is €324. (Across all leasable cars the finance charge is €8,904 per
+contract; we use the affordable segment because that is who the advisor serves.)
+
+### Per 1,000 people who arrive wanting a car
+
+Same demand, same conversion rates, same revenue model — €324 leasing
+brokerage. The only differences are cost per conversation and how many
+conversations actually happen.
+
+| | Traditional | Advisor |
+|---|---:|---:|
+| Arrive wanting a car | 1,000 | 1,000 |
+| Actually get a conversation | **650** (35% of calls missed) | **1,000** |
+| Reach an emailed offer (35%) | 228 | 350 |
+| Close at 10.2% | 23 | 36 |
+| Revenue at €324 per contract | €7,582 | €11,664 |
+| Cost of handling | €3,250 | **€115** |
+| **Contribution** | **€4,332** | **€11,549** |
+| Handling cost as a share of revenue | **43%** | **1.0%** |
+
+**The advisor produces about 2.7× the contribution.** Note where that comes
+from: only €3,135 of the €7,217 difference is the cost saving. The larger half
+is revenue that the traditional setup never earns, because the conversation
+never happened.
+
+That is the sentence to say: *the cost saving is 40×, but the reason it matters
+is coverage, not cost.* Halving the price of something that only happens 65% of
+the time is worth less than making it happen every time.
+
+### What this changes structurally
+
+In the traditional setup, qualification costs **43% of the revenue it produces**,
+so a dealer rations it: qualify the promising ones, let the rest self-serve.
+At **1%**, rationing makes no sense — you talk to everybody, including the
+browsers, including 2am, including the ones who turn out to want a €200 car.
+The cheap conversations subsidise nothing; they cost eleven cents.
+
 ## Assumptions
 
 The median conversation is modelled as six exchanges, six seconds of customer
 speech and ten of agent speech each, a three-minute session, one email. Those
 speech figures match the demo script; the session length assumes the customer
 spends about half the call listening, reading the screen and thinking.
+
+The 1,000-conversation comparison assumes: 35% of conversations reach an emailed
+offer, a 10.2% lead-to-sale close rate (the published internet-lead average), a
+650/1,000 handling rate for the traditional setup (from the 35% missed-call
+benchmark), and €5.00 per human-handled qualification (mid-range of €2–14). The
+close rate is applied identically to both, which flatters the traditional setup:
+a lead answered 11.5 hours later almost certainly converts worse than one
+answered instantly.
 
 The model ignores plan floors — LiveKit Ship at $50/month, Tavus Starter at
 $22–59/month — because they are fixed costs, not per-interaction ones. Below a
