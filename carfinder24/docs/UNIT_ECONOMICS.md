@@ -92,20 +92,88 @@ conversations, because that is what it costs.
 5. Prompt and tool schemas are 1,711 tokens re-sent every turn — real, but
    worth $0.004. Do not trade clarity in a tool docstring for that.
 
-## What it means commercially
+## What the market pays for the same thing
 
-Every conversation that ends in an emailed offer is a lead, delivered for
-**about eleven cents**, with the customer's budget, mileage, term and chosen car
-attached — a far better qualified lead than a form fill.
+Our eleven cents only means something against what a lead actually costs today.
+These are published 2026 benchmarks; sources at the bottom.
 
-The comparison to make on stage is against what a dealer currently pays for a
-used-car lead. We deliberately do not put a number on that here: it is the one
-figure in this document we cannot compute from our own data, and inventing it
-would undermine everything we can.
+### Per lead
 
-At 1,000 conversations a day, voice-only, the stack costs **$126/day** —
-roughly $46,000 a year — plus LiveKit and Tavus plan floors. That is the number
-to hold against the value of a thousand qualified leads a day.
+| What | Cost per lead |
+|---|---|
+| **carwow** — per enquirer passed to a dealer | **£49 + VAT** (≈ €57) |
+| Pay-per-lead providers (Autotrader, Cars.com and similar) | $40–100 |
+| Google Vehicle Ads, well optimised | $25–45 |
+| Reported dealership average | $42.95 |
+| Cox Automotive 2026 industry average (all-in spend ÷ leads) | **$326** — up 15.2% on 2025; EV leads $412 |
+| **CarFinder24 advisor, per emailed offer** | **$0.126** |
+
+carwow is the comparison that matters: same product shape — an online car-buying
+platform that hands qualified enquiries to dealers — in the same markets, the UK
+and Germany. They charge **£49 per enquirer**, plus a success fee of **£250–500
+per sale**. We produce a *more* qualified enquiry — budget, mileage, term, down
+payment and a specific car, all confirmed out loud — for about **1/500th** of
+what they charge for one.
+
+### Per sale
+
+| What | Cost per sale |
+|---|---|
+| carwow success fee | £250–500 |
+| Industry cost per vehicle sold | $250–350 |
+| NADA, all channels, per new vehicle | $739 |
+| Third-party-sourced sales | $800–1,000 |
+| Owned-channel sales | $100–200 |
+| **Ours at a 10.2% close rate** | **$1.23** |
+| **Ours at a pessimistic 2.5% close rate** | **$5.04** |
+
+Internet leads close at about **10.2%** on average, third-party leads at 8–12%,
+and a dealer's own-website leads at **15–25%** — four to five times better,
+because they are exclusive and the visitor came on purpose.
+
+### What German dealers actually pay the portals
+
+- **mobile.de**: roughly €30 per listing plus a €60 monthly base; high-volume
+  dealers get under €10 per vehicle.
+- **AutoScout24**: moved to a performance-based tariff in 2026, a **25–30%
+  increase** for many dealers.
+- A mid-sized dealership pays **€1,500–3,000 a month** to the portals —
+  €18,000–36,000 a year — for leads it does not own.
+
+That last phrase is the opening. Dealers are paying more every year for leads
+that are rented, not owned, and portal pricing is going up, not down.
+
+## The honest version of this comparison
+
+**Our $0.126 is marginal inference cost, not customer acquisition cost.** It
+does not include getting the visitor to the page — and for a dealer, that *is*
+the cost. A €326 cost per lead mostly buys attention: persuading a stranger to
+raise their hand. We do not buy attention. We convert attention the platform
+already has.
+
+It also excludes engineering, inventory data, support, compliance, and the
+LiveKit and Tavus plan floors. Anyone who claims "500× cheaper than carwow" from
+this page is claiming something the page does not support, and a partner will
+take it apart in one question.
+
+The defensible claim is narrower and better:
+
+> Owned-channel leads convert at 15–25% against 8–12% for bought ones, and cost
+> $100–200 per sale against $800–1,000. Our advisor is an owned-channel tool
+> that makes the best-converting category better — and its running cost rounds
+> to zero against either number.
+
+### The payback, which is the number to say out loud
+
+An additional used-car sale carries **$1,253–3,000** of front-end gross.
+
+At $0.126 per conversation, that one extra sale pays for **roughly 10,000 to
+24,000 conversations**.
+
+So the advisor pays for itself if it produces **one additional sale per ~10,000
+conversations** — a lift of about **0.01%**. Every conversation after that is
+margin. That is the whole business case, and it does not depend on any number we
+had to invent.
 
 ## Assumptions
 
@@ -128,6 +196,15 @@ Rates are list prices as of August 2026:
   minute, $0.10–0.12 per GB downstream, upstream free
 - Tavus CVI: $0.37 per minute, 30-second minimum per conversation
 - Amazon SES: $0.10 per 1,000 emails
+
+Market benchmarks: carwow's published dealer price list (£49 + VAT per
+enquirer, £250–500 success fee); Cox Automotive 2026 Dealer Digital Marketing
+Report ($326 average CPL, +15.2% year on year); NADA ($739 per new vehicle
+across all channels); 2026 automotive marketing benchmark round-ups for close
+rates (10.2% internet leads, 15–25% own-site) and cost per sale; German portal
+pricing from kfz-betrieb and dealer-press reporting on the 2026 AutoScout24
+tariff change; used-vehicle front-end gross of $1,253 (Q1 2026 average) to
+$2,000–3,000 (healthy).
 
 The 1,711-token fixed context is measured from `prompts.py` and the five tool
 docstrings, not estimated.

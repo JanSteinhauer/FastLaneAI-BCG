@@ -77,6 +77,17 @@ Anchored in our own data — no invented market numbers.
 - **Where the money lands**: dealers get leads that are pre-qualified on
   affordability rather than on a price guess; the leasing attach rate goes up
   because the rate is the thing being shopped, not an afterthought at checkout.
+- **What it costs**: a full conversation ending in an emailed offer runs about
+  **eleven cents**. carwow charges dealers **£49 per enquirer** plus £250–500 on
+  the sale; a mid-sized German dealer pays the portals €1,500–3,000 a month for
+  leads it does not own, and AutoScout24's 2026 tariff raised that 25–30%.
+- **The payback line**: one additional used-car sale carries $1,253–3,000 of
+  front-end gross, which pays for **10,000 to 24,000 conversations**. The
+  advisor pays for itself at a lift of 0.01%.
+- **Be honest about what that is**: eleven cents is running cost, not customer
+  acquisition cost — it does not buy the visitor's attention, it converts
+  attention the platform already has. Owned-channel leads close at 15–25%
+  against 8–12% for bought ones; this makes the best category better.
 - **What production needs**: live inventory, real lessor pricing, verified
   customer opt-in, and a human at the contract. We are honest about that.
 
