@@ -19,18 +19,28 @@ given me.
 
 The advisor is built. A visitor talks to it, and it:
 
-1. asks what they want to spend **per month** and searches 45,611 real listings
-   by *monthly leasing rate* — not by sticker price;
-2. shows the shortlist on their screen while it talks;
-3. looks a car up in detail and checks its price against comparable listings;
-4. quotes the exact, bindable leasing rate with the full breakdown;
-5. emails the car summary and the leasing agreement, on their say-so.
+1. leads them from vague to specific — and when they say "I don't know", asks
+   what the car is *for* and works the answer out from that, with reasons;
+2. asks what they want to spend **per month** and searches 45,611 real listings
+   by *monthly leasing rate* — not by sticker price (or by purchase price, if
+   they would rather buy);
+3. shows the shortlist on their screen while it talks, partner dealers first
+   and badged as such;
+4. looks a car up in detail and scores whether it is a good price, out of five,
+   against comparable listings;
+5. quotes the exact, bindable leasing rate — and explains, step by step, where
+   that number came from;
+6. refuses terms we do not offer instead of quietly rounding them, and says
+   which ones we do;
+7. summarises what they chose and why that car answers it;
+8. emails the offer, with the draft leasing agreement attached as a PDF if they
+   ask for the contract itself.
 
 Read `docs/` before changing anything:
 
 | Doc | What's in it |
 |---|---|
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | The three processes, the five tools, and the two design decisions worth defending |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | The advisory funnel, the three processes, the ten tools, and the five design decisions worth defending |
 | [docs/AGENT_HARNESS.md](docs/AGENT_HARNESS.md) | How to add a tool or a persona, the restart rules, failure behaviour, the Tavus avatar |
 | [docs/SECURITY.md](docs/SECURITY.md) | Threat model: conversation injection, injection through listing data, outbound abuse, false statements |
 | [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) | The rehearsed live demo, line by line |
@@ -38,8 +48,11 @@ Read `docs/` before changing anything:
 | [docs/ROLES.md](docs/ROLES.md) | Who does what now that the code is frozen |
 | [docs/pitch-deck.html](docs/pitch-deck.html) | The deck itself — arrow keys, `N` for speaker notes, `T` for the rehearsal timer |
 
-`uv run pytest tests -q` — 29 tests, including the parity check that stops the
-SQL and Python leasing models from ever disagreeing.
+`uv run pytest tests -q` — 128 tests. The ones worth knowing about: the parity
+check that stops the SQL and Python leasing models from ever disagreeing, the
+refusal tests that stop a customer being rounded onto terms they never chose,
+and the deal-score tests that keep "is this a good price?" arithmetic. Nothing
+in the suite sends an email — the mailer is replaced with a recorder.
 
 Two switches in `.env`: `USE_AVATAR=1` gives the advisor a Tavus face,
 `DEMO_INJECTION=1` plants the hostile listing used in the security demo.

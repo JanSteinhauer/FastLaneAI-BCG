@@ -43,8 +43,11 @@ function CarCard({ car }) {
         <span className="meta">
           {[
             car.year,
+            // en-GB, then the narrow no-break space the rest of the product
+            // groups numbers with. de-DE rendered 64 000 as "64.000", which an
+            // English reader parses as a decimal point.
             car.mileage_km != null
-              ? `${car.mileage_km.toLocaleString("de-DE")} km`
+              ? `${car.mileage_km.toLocaleString("en-GB").replace(/,/g, " ")} km`
               : null,
             car.fuel,
           ]
