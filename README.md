@@ -13,3 +13,7 @@ Copy `carfinder24/.env.example` to `carfinder24/.env` and fill in the team
 credentials. `.env` and `.claude/settings.json` are gitignored — never commit keys. For
 Claude Code, create `carfinder24/.claude/settings.json` with
 `{"env": {"ANTHROPIC_API_KEY": "<team key>"}}`.
+
+
+
+https://tumde-my.sharepoint.com/:p:/g/personal/louis_forster_tum_de/IQAuVaSbycZTQ50rcCLq6SFuAZXPEqGeV1JKcZ3UyAmkVD8?e=GbMeUL
