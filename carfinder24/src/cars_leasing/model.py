@@ -42,6 +42,33 @@ class NotLeasable(ValueError):
 
 
 @dataclass(frozen=True)
+class ChoiceProblem:
+    """One thing the customer asked for that we do not offer.
+
+    `message` is a whole sentence written to be read out loud, and `allowed`
+    carries the buckets to offer instead — so a refusal always comes with the
+    choices that would work.
+    """
+
+    field: str  # term_months | annual_km | down_payment | price
+    message: str
+    allowed: tuple[int, ...] | None = None
+
+
+class InvalidChoice(NotLeasable):
+    """The customer's terms are outside what CarFinder24 offers.
+
+    Distinct from a plain NotLeasable (which is about *this car*): here the
+    inputs themselves are unavailable, so the fix is to pick from `.problems`'
+    allowed buckets. No sale proceeds until they do.
+    """
+
+    def __init__(self, problems: tuple[ChoiceProblem, ...] | list[ChoiceProblem]) -> None:
+        self.problems: tuple[ChoiceProblem, ...] = tuple(problems)
+        super().__init__(" ".join(p.message for p in self.problems))
+
+
+@dataclass(frozen=True)
 class LeasingQuote:
     monthly_rate: float  # EUR gross per month
     monthly_depreciation: float  # share covering the value the car loses
@@ -52,6 +79,7 @@ class LeasingQuote:
     annual_km: int
     down_payment: int
     apr: float
+    price: int  # the listing price the quote was built from
 
 
 def compute_quote(
@@ -71,15 +99,17 @@ def compute_quote(
     the listing's attributes; term_months, annual_km and down_payment are the
     customer's choice.
     """
-    if term_months not in TERMS:
-        raise NotLeasable(f"term_months must be one of {TERMS}")
-    if annual_km not in KM_TIERS:
-        raise NotLeasable(f"annual_km must be one of {KM_TIERS}")
+    # Everything the customer *chose* is checked in one place, so an
+    # impossible request always comes back with the buckets that would work.
+    require_valid_choices(
+        term_months=term_months,
+        annual_km=annual_km,
+        down_payment=down_payment,
+        price=price,
+    )
 
     if seller_type != "Dealer":
         raise NotLeasable("Only dealer listings can be leased, this is a private sale.")
-    if price < MIN_PRICE:
-        raise NotLeasable(f"Cars under €{MIN_PRICE:,} are not leased.")
 
     years = term_months / 12
     this_year = datetime.datetime.now(tz=datetime.UTC).year
@@ -94,12 +124,6 @@ def compute_quote(
             f"The car would exceed {MAX_END_MILEAGE_KM:,} km by the end of the "
             "term. A lower mileage allowance or shorter term may still work."
         )
-    if not 0 <= down_payment <= MAX_DOWN_PAYMENT_SHARE * price:
-        raise NotLeasable(
-            f"The down payment must be between €0 and "
-            f"{MAX_DOWN_PAYMENT_SHARE:.0%} of the price."
-        )
-
     # Residual value: continue the decay curve the current price sits on,
     # then adjust for driving more/less than the norm it assumes.
     decay = FUEL_DECAY.get(fuel_category or "", BASE_ANNUAL_DECAY)
@@ -129,4 +153,112 @@ def compute_quote(
         annual_km=annual_km,
         down_payment=down_payment,
         apr=APR,
+        price=price,
     )
+
+
+# ---------------------------------------------------------------------------
+# What a customer may choose
+#
+# Terms and mileage tiers are *buckets*, not free numbers: a lessor prices
+# 36 months / 15,000 km, not "about three years, maybe forty thousand". So a
+# value outside a bucket is not rounded to the nearest one — silently moving a
+# customer onto terms they did not ask for is how a voice agent sells the wrong
+# contract. It is refused, and the refusal names the buckets that do exist.
+# ---------------------------------------------------------------------------
+
+
+def validate_choices(
+    *,
+    term_months: int | None = None,
+    annual_km: int | None = None,
+    down_payment: int | None = None,
+    price: int | None = None,
+) -> tuple[ChoiceProblem, ...]:
+    """Check the customer's choices against what we offer. Never raises.
+
+    Only the arguments that are not None are checked, so this works both for a
+    half-collected conversation and for a complete request. `price` is the
+    listing price — needed to bound the down payment, and checked against the
+    floor when given.
+    """
+    problems: list[ChoiceProblem] = []
+
+    if term_months is not None and term_months not in TERMS:
+        problems.append(
+            ChoiceProblem(
+                "term_months",
+                f"We lease for {_spoken_list(TERMS)} months — "
+                f"{term_months} months is not one of our terms.",
+                TERMS,
+            )
+        )
+    if annual_km is not None and annual_km not in KM_TIERS:
+        problems.append(
+            ChoiceProblem(
+                "annual_km",
+                f"The mileage allowances are {_spoken_list(KM_TIERS)} kilometres "
+                f"a year — {_grouped(annual_km)} is not one of them.",
+                KM_TIERS,
+            )
+        )
+    if price is not None and price < MIN_PRICE:
+        problems.append(
+            ChoiceProblem(
+                "price",
+                f"Leasing starts at a car price of \u20ac{_grouped(MIN_PRICE)}, so "
+                "this one can only be bought, not leased.",
+            )
+        )
+    if down_payment is not None:
+        if down_payment < 0:
+            problems.append(
+                ChoiceProblem("down_payment", "A down payment cannot be negative.")
+            )
+        elif price is not None and down_payment > MAX_DOWN_PAYMENT_SHARE * price:
+            cap = int(MAX_DOWN_PAYMENT_SHARE * price)
+            problems.append(
+                ChoiceProblem(
+                    "down_payment",
+                    f"The down payment can be at most {MAX_DOWN_PAYMENT_SHARE:.0%} of "
+                    f"the price, so up to \u20ac{_grouped(cap)} for this car.",
+                )
+            )
+    return tuple(problems)
+
+
+def require_valid_choices(**kwargs: int | None) -> None:
+    """validate_choices, but raising InvalidChoice — use before quoting."""
+    if problems := validate_choices(**kwargs):
+        raise InvalidChoice(problems)
+
+
+def leasing_options(price: int | None = None) -> dict[str, object]:
+    """Everything a customer is allowed to pick — the answer to "what can I have?".
+
+    Handed straight to the model when a request is refused, so the next
+    sentence out of the advisor is the list of terms that would work.
+    """
+    options: dict[str, object] = {
+        "term_months": list(TERMS),
+        "annual_km": list(KM_TIERS),
+        "min_price_eur": MIN_PRICE,
+        "max_down_payment_share": MAX_DOWN_PAYMENT_SHARE,
+        "max_car_age_at_end_years": MAX_END_AGE_YEARS,
+        "max_odometer_at_end_km": MAX_END_MILEAGE_KM,
+        "contract_type": "Kilometerleasing, private customer, gross rate incl. VAT",
+    }
+    if price is not None:
+        options["max_down_payment_eur"] = int(MAX_DOWN_PAYMENT_SHARE * price)
+    return options
+
+
+def _grouped(value: int) -> str:
+    """15000 -> '15 000'; a comma here would be read as a pause."""
+    return f"{value:,}".replace(",", " ")
+
+
+def _spoken_list(values: tuple[int, ...]) -> str:
+    """'12, 24, 36 or 48' — a list a voice model can read without stumbling."""
+    parts = [_grouped(v) for v in values]
+    return f"{', '.join(parts[:-1])} or {parts[-1]}" if len(parts) > 1 else parts[0]

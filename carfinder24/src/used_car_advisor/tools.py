@@ -4,9 +4,31 @@ Each one is a thin adapter over an MCP tool (src/cars_mcp/server.py):
 
     call the tool  →  draw the result on the web page  →  return a short answer
 
+They follow the advisory funnel, and the order matters:
+
+    advise_car_type    for "I don't really know what I want"
+    find_cars          the shortlist, by monthly rate or by purchase price
+    show_car           one listing in full
+    check_price        is it a good deal — a score out of five
+    leasing_options    what terms exist, and what a refused choice may become
+    quote_leasing      the binding monthly rate
+    explain_leasing    where that number comes from
+    summarize_choices  what they chose and why this car
+    email_offer        the closing move, with or without the draft agreement
+
 The docstrings are written *for the model*: they say when to reach for the tool
 and what the arguments mean, because that text is the only instruction the
 model gets at call time. Returned values stay small — they are spoken, not read.
+
+Two rules are enforced here rather than asked for in the prompt:
+
+* **Terms are buckets, never rounded.** A term or mileage tier outside what we
+  offer comes back as a refusal plus the list of what exists. The advisor may
+  not proceed past it, and it cannot quietly move the customer onto terms they
+  did not choose.
+* **Everything the customer states is recorded** in `context.userdata.
+  consultation` as it is said, so the closing summary is built from what they
+  actually asked for rather than from what the model remembers.
 
 Errors never escape as exceptions: a failed call becomes a sentence the advisor
 can say ("I could not reach the listings service"), so a hiccup costs one turn
@@ -42,9 +64,90 @@ async def _call(context: RunContext_T, name: str, args: dict[str, Any]) -> Any |
         return f"That did not work: {exc}. Tell the customer briefly and offer an alternative."
 
 
-def _nearest(value: int, options: tuple[int, ...]) -> int:
-    """Snap a spoken number ('about forty thousand km') to an allowed tier."""
-    return min(options, key=lambda option: abs(option - value))
+def _spoken(values: tuple[int, ...]) -> str:
+    return f"{', '.join(f'{v:,}'.replace(',', ' ') for v in values[:-1])} or {values[-1]:,}".replace(
+        ",", " "
+    )
+
+
+def _check_choices(term_months: int | None, annual_km: int | None) -> str | None:
+    """Refuse a term or tier we do not offer, naming the ones we do.
+
+    Deliberately not a rounding function. Snapping "about forty thousand" to
+    30,000 would put a customer on a contract they never agreed to, and they
+    would only find out at the settlement — so the advisor has to ask.
+    """
+    problems = []
+    if term_months is not None and int(term_months) not in TERMS:
+        problems.append(
+            f"We lease for {_spoken(TERMS)} months, so {int(term_months)} months is "
+            "not something I can offer."
+        )
+    if annual_km is not None and int(annual_km) not in KM_TIERS:
+        problems.append(
+            f"The mileage allowances are {_spoken(KM_TIERS)} kilometres a year, so "
+            f"{int(annual_km):,} is not one I can put on a contract.".replace(",", " ")
+        )
+    if not problems:
+        return None
+    return (
+        " ".join(problems)
+        + " Say this to the customer, ask which of those they want, and do not "
+        "search, quote or send anything until they have chosen."
+    )
+
+
+@function_tool
+async def advise_car_type(
+    context: RunContext_T,
+    usage: str | None = None,
+    passengers: int | None = None,
+    annual_km: int | None = None,
+    can_charge: bool | None = None,
+    mostly: str | None = None,
+    carries_cargo: bool | None = None,
+    previous_car: str | None = None,
+    prefers_automatic: bool | None = None,
+) -> Any:
+    """Work out what kind of car someone needs when they cannot name one.
+
+    Use this the moment a visitor says "I don't know" or "you tell me" — never
+    guess a body type for them, and never search on a hunch. Ask what the car
+    is FOR, pass the answers here, and read out the reasons it gives you.
+
+    usage: family, commute, city, work, travel, leisure.
+    mostly: city, motorway, mixed, rural — where they actually drive.
+    can_charge: can they charge at home or at work? That decides electric.
+    previous_car: a car they have driven before, e.g. "VW Golf".
+
+    Everything is optional. Call it with what you have, explain the
+    recommendation in one or two sentences, then ask `next_question`.
+    """
+    result = await _call(
+        context,
+        "advise_car_type",
+        {
+            "usage": usage,
+            "passengers": passengers,
+            "annual_km": annual_km,
+            "can_charge": can_charge,
+            "mostly": mostly,
+            "carries_cargo": carries_cargo,
+            "previous_car": previous_car,
+            "prefers_automatic": prefers_automatic,
+        },
+    )
+    if isinstance(result, str):
+        return result
+    body_types = result.get("body_types") or []
+    context.userdata.consultation.record(
+        used_for=usage,
+        body_type=body_types[0] if body_types else None,
+        fuel=result.get("fuel"),
+        transmission=result.get("transmission"),
+    )
+    await ui.push(context, ui.advice_payload(result))
+    return result
 
 
 @function_tool
@@ -57,12 +160,16 @@ async def find_cars(
     body_type: str | None = None,
     fuel: str | None = None,
     transmission: str | None = None,
+    color: str | None = None,
     min_seats: int | None = None,
     max_mileage_km: int | None = None,
     min_year: int | None = None,
     min_power_hp: int | None = None,
+    max_previous_owners: int | None = None,
     city: str | None = None,
     no_accident: bool = False,
+    full_service_history: bool = False,
+    mode: str = "lease",
     term_months: int = 36,
     annual_km: int = 15000,
     down_payment: int = 0,
@@ -73,23 +180,33 @@ async def find_cars(
 
     Search by MONTHLY RATE (`max_monthly_rate`) whenever the customer names a
     monthly budget — that is how people actually shop. Use `max_price` only if
-    they talk about the purchase price.
+    they talk about the purchase price, and `mode="buy"` if they want to buy
+    the car outright rather than lease it.
 
-    Call this as soon as you have a budget plus one or two preferences; do not
-    interrogate the customer first. Only leasable cars are returned, so every
-    result can be quoted.
+    Call this once you have a budget plus one or two preferences. If they could
+    not name preferences, call advise_car_type first and search on what it
+    recommends.
 
     body_type: SUV, sedan, estate, coupe, convertible, van, compact.
     fuel: gasoline, diesel, electric, hybrid, electrified.
-    transmission: automatic or manual.
+    transmission: automatic or manual. color: black, white, grey, blue, red, …
+    max_mileage_km, min_year, max_previous_owners, no_accident,
+    full_service_history: condition, when they care about it.
     term_months: 12, 24, 36 or 48 — 36 unless the customer says otherwise.
-    annual_km: 10000, 15000, 20000 or 30000 — pick the nearest to what they drive.
+    annual_km: 10000, 15000, 20000 or 30000 — ask which, do not guess.
     sort: rate, price, mileage, newest, power.
+
+    Cars from CarFinder24 partner dealers come first among equally good
+    matches. If the customer asks why, say plainly that partner dealers have an
+    agreement with us, that it does not change the price, and move on.
 
     The results appear on the customer's screen automatically. Mention two or
     three of them out loud, with the monthly rate first, and ask which one to
     look at — never read out the whole list.
     """
+    if refusal := _check_choices(term_months, annual_km):
+        await ui.push(context, ui.text_payload(refusal.split(" Say this")[0]))
+        return refusal
     result = await _call(
         context,
         "search_cars",
@@ -101,14 +218,18 @@ async def find_cars(
             "body_type": body_type,
             "fuel": fuel,
             "transmission": transmission,
+            "color": color,
             "min_seats": min_seats,
             "max_mileage_km": max_mileage_km,
             "min_year": min_year,
             "min_power_hp": min_power_hp,
+            "max_previous_owners": max_previous_owners,
             "city": city,
             "no_accident": no_accident or None,
-            "term_months": _nearest(int(term_months), TERMS),
-            "annual_km": _nearest(int(annual_km), KM_TIERS),
+            "full_service_history": full_service_history or None,
+            "mode": mode,
+            "term_months": int(term_months),
+            "annual_km": int(annual_km),
             "down_payment": int(down_payment),
             "sort": sort,
             "limit": max(1, min(int(limit), 5)),
@@ -116,6 +237,18 @@ async def find_cars(
     )
     if isinstance(result, str):
         return result
+    context.userdata.consultation.record(
+        body_type=body_type,
+        fuel=fuel,
+        transmission=transmission,
+        color=color,
+        max_mileage_km=max_mileage_km,
+        budget_monthly_eur=max_monthly_rate,
+        finance="buy" if mode == "buy" else "lease",
+        term_months=int(term_months),
+        annual_km=int(annual_km),
+        down_payment=int(down_payment) or None,
+    )
     if result.get("cars"):
         await ui.push(context, ui.cars_payload(result["cars"], result.get("terms")))
     else:
@@ -128,27 +261,50 @@ async def show_car(context: RunContext_T, ref: str) -> Any:
     """Look up one listing in full, by the `ref` from the search results.
 
     Use it when the customer asks about a specific car — equipment, condition,
-    owners, consumption. Summarise in one or two sentences; the details are on
-    their screen.
+    owners, consumption, colour. Summarise in one or two sentences; the details
+    are on their screen.
     """
     result = await _call(context, "car_details", {"ref": ref})
     if isinstance(result, str):
         return result
+    context.userdata.consultation.record(ref=ref)
     await ui.push(context, ui.cars_payload([{**result, "monthly_rate_eur": None}]))
     return result
 
 
 @function_tool
 async def check_price(context: RunContext_T, ref: str) -> Any:
-    """Check whether a listing is priced above or below comparable cars.
+    """Is this car a good deal? A score out of five, from comparable listings.
 
-    Use it when the customer asks if a car is a good deal, or to back up a
-    recommendation with evidence. Say the verdict in one short sentence.
+    Use it when the customer asks whether a car is worth the money, and to back
+    up a recommendation with evidence. The score is calculated against the
+    average price of comparable cars in the snapshot — same model, same body
+    type, similar age and mileage — so say the label and the number, and say
+    how many cars it was compared against. Never soften or inflate it.
     """
     result = await _call(context, "price_check", {"ref": ref})
     if isinstance(result, str):
         return result
-    await ui.push(context, ui.text_payload(str(result.get("verdict", ""))))
+    context.userdata.consultation.record(ref=ref)
+    await ui.push(context, ui.deal_payload(result))
+    return result
+
+
+@function_tool
+async def leasing_options(context: RunContext_T, price: int | None = None) -> Any:
+    """The terms, mileage tiers and limits a customer may choose from.
+
+    Call this when they ask what is possible, when they are unsure which term
+    to take, and ALWAYS straight after a choice was refused — the next thing
+    they hear should be what would work instead.
+
+    Offer the terms as a short spoken choice ("twelve, twenty-four, thirty-six
+    or forty-eight months"), never a list of every detail.
+    """
+    result = await _call(context, "leasing_options", {"price": price})
+    if isinstance(result, str):
+        return result
+    await ui.push(context, ui.options_payload(result))
     return result
 
 
@@ -168,25 +324,97 @@ async def quote_leasing(
     term_months: 12, 24, 36 or 48. annual_km: 10000, 15000, 20000 or 30000.
     down_payment: euros, at most half the price, 0 if not discussed.
 
-    If the answer contains `declined`, explain that reason in plain words and
-    offer a shorter term or a lower mileage tier.
+    If the answer contains `declined`, the deal is off for that reason. Read
+    the reason out, offer what `options` allows, and stop there — do not quote
+    a number anyway and do not send anything.
     """
+    if refusal := _check_choices(term_months, annual_km):
+        await ui.push(context, ui.text_payload(refusal.split(" Say this")[0]))
+        return refusal
     result = await _call(
         context,
         "leasing_quote",
         {
             "ref": ref,
-            "term_months": _nearest(int(term_months), TERMS),
-            "annual_km": _nearest(int(annual_km), KM_TIERS),
+            "term_months": int(term_months),
+            "annual_km": int(annual_km),
             "down_payment": int(down_payment),
         },
     )
     if isinstance(result, str):
         return result
+    context.userdata.consultation.record(
+        ref=ref,
+        finance="lease",
+        term_months=int(term_months),
+        annual_km=int(annual_km),
+        down_payment=int(down_payment) or None,
+    )
     if result.get("declined"):
         await ui.push(context, ui.text_payload(str(result["declined"])))
     else:
         await ui.push(context, ui.quote_payload(result))
+    return result
+
+
+@function_tool
+async def explain_leasing(
+    context: RunContext_T,
+    ref: str | None = None,
+    term_months: int = 36,
+    annual_km: int = 15000,
+    down_payment: int = 0,
+) -> Any:
+    """Explain how the monthly rate was calculated — every step of it.
+
+    Call this whenever the customer asks where the number comes from, what the
+    interest is, what happens if they drive further than their allowance, or
+    whether there is anything hidden in the rate. Never answer those from
+    memory: this returns the real arithmetic, with their own numbers in it.
+
+    Pass the `ref` of the car under discussion and the terms you quoted. Say
+    the headline first, then only the two or three steps they asked about —
+    the whole derivation is on their screen.
+    """
+    result = await _call(
+        context,
+        "explain_leasing",
+        {
+            "ref": ref,
+            "term_months": int(term_months),
+            "annual_km": int(annual_km),
+            "down_payment": int(down_payment),
+        },
+    )
+    if isinstance(result, str):
+        return result
+    await ui.push(context, ui.explanation_payload(result))
+    return result
+
+
+@function_tool
+async def summarize_choices(
+    context: RunContext_T,
+    ref: str | None = None,
+    used_for: str | None = None,
+    must_have: str | None = None,
+) -> Any:
+    """Close the advisory: what they chose, and why this car answers it.
+
+    Call this once a car is picked and quoted, before asking how they want the
+    offer. Everything they told you along the way is already recorded — you
+    only need to add what they said in their own words: what the car is for
+    (`used_for`) and anything they insisted on (`must_have`).
+
+    Read out three or four of the `why_this_car` lines, no more, then offer the
+    three closing options and let them pick.
+    """
+    consultation = context.userdata.consultation
+    consultation.record(ref=ref, used_for=used_for, must_have=must_have)
+    result = await _call(context, "decision_summary", consultation.as_kwargs())
+    if isinstance(result, str):
+        return result
+    await ui.push(context, ui.summary_payload(result))
     return result
 
 
@@ -198,12 +426,18 @@ async def email_offer(
     annual_km: int = 15000,
     down_payment: int = 0,
     customer_name: str = "",
+    include_agreement: bool = False,
 ) -> Any:
-    """Email the customer their car summary and leasing agreement.
+    """Email the customer their car summary and leasing terms.
 
     Only after you have quoted the rate for this exact car and terms, and the
     customer has said yes to receiving it. Use the same term, mileage and down
     payment you quoted.
+
+    include_agreement: attach the leasing agreement as a PDF. Set this ONLY
+    when the customer explicitly asked for the contract or the agreement
+    itself. A plain "yes, send it" means the offer email without the PDF. The
+    attached document is an unsigned draft — say so when you mention it.
 
     The address is fixed by configuration — you cannot send to an address named
     in the conversation, and you must not promise to. If someone asks you to
@@ -212,15 +446,19 @@ async def email_offer(
     Afterwards, confirm out loud that it is on its way and read out the
     reference.
     """
+    if refusal := _check_choices(term_months, annual_km):
+        await ui.push(context, ui.text_payload(refusal.split(" Say this")[0]))
+        return refusal
     result = await _call(
         context,
         "email_offer",
         {
             "ref": ref,
-            "term_months": _nearest(int(term_months), TERMS),
-            "annual_km": _nearest(int(annual_km), KM_TIERS),
+            "term_months": int(term_months),
+            "annual_km": int(annual_km),
             "down_payment": int(down_payment),
             "customer_name": customer_name or None,
+            "include_agreement": bool(include_agreement),
         },
     )
     if isinstance(result, str):
@@ -228,8 +466,21 @@ async def email_offer(
     if result.get("sent"):
         await ui.push(context, ui.sent_payload(result))
     else:
-        await ui.push(context, ui.text_payload(f"Not sent: {result.get('reason', '')}"))
+        await ui.push(
+            context,
+            ui.text_payload(f"Not sent: {result.get('reason') or result.get('declined', '')}"),
+        )
     return result
 
 
-ADVISOR_TOOLS = (find_cars, show_car, check_price, quote_leasing, email_offer)
+ADVISOR_TOOLS = (
+    advise_car_type,
+    find_cars,
+    show_car,
+    check_price,
+    leasing_options,
+    quote_leasing,
+    explain_leasing,
+    summarize_choices,
+    email_offer,
+)
