@@ -37,6 +37,7 @@ Read `docs/` before changing anything:
 | [docs/PITCH.md](docs/PITCH.md) | The five-minute pitch: beats, timings, the words |
 | [docs/ROLES.md](docs/ROLES.md) | Who does what now that the code is frozen |
 | [docs/PROGRESS_TRACKER.md](docs/PROGRESS_TRACKER.md) | The two-stage progress strip and how it derives from the MCP tool calls |
+| [docs/UNIT_ECONOMICS.md](docs/UNIT_ECONOMICS.md) | What one conversation costs, the formula behind it, and the levers |
 | [docs/BRAND_COLOURS.md](docs/BRAND_COLOURS.md) | What colour is actually inside each brand logo SVG, and why not to tint cards by brand |
 | [docs/BRANDS.md](docs/BRANDS.md) | All 25 brands with leasable counts and rates — which ones are safe to name on stage |
 | [docs/TAVUS_REPLICAS.md](docs/TAVUS_REPLICAS.md) | Every avatar face on the account — 90 stock, 5 custom — with IDs and thumbnails |
