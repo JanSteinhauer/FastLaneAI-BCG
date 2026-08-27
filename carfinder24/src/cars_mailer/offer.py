@@ -38,7 +38,7 @@ def offer_reference(car_id: str, term_months: int, annual_km: int, down_payment:
 def _eur(value: float | int | None) -> str:
     if value is None:
         return "—"
-    return f"{value:,.2f} €".replace(",", " ")
+    return f"€{value:,.2f}".replace(",", " ")
 
 
 def _row(label: str, value: str, strong: bool = False) -> str:
@@ -127,7 +127,7 @@ def offer_email_html(
    <div style="font-size:15px;font-weight:700;color:{INK};margin-bottom:6px">
      Leasing agreement</div>
    <table style="width:100%;border-collapse:collapse;margin-bottom:22px">
-    {_row("Contract type", "Kilometerleasing, private customer")}
+    {_row("Contract type", "Mileage-based lease, private customer")}
     {_row("Term", f"{quote.term_months} months")}
     {_row("Mileage allowance", f"{quote.annual_km:,} km / year".replace(",", chr(8239)))}
     {_row("Down payment", _eur(quote.down_payment))}
@@ -137,7 +137,7 @@ def offer_email_html(
     {_row("Nominal annual rate", f"{quote.apr * 100:.2f} %")}
     {_row("Projected residual value at end of term", _eur(quote.residual_value))}
     {_row("Total payments over the term", _eur(quote.total_cost), strong=True)}
-    {_row("Excess mileage", f"{EXTRA_KM_VALUE:.2f} € per extra km")}
+    {_row("Excess mileage", f"€{EXTRA_KM_VALUE:.2f} per extra km")}
     {_row("Odometer at end of term (projected)", f"{end_km:,} km".replace(",", chr(8239)))}
    </table>
 
