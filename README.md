@@ -16,4 +16,4 @@ Claude Code, create `carfinder24/.claude/settings.json` with
 
 
 
-https://tumde-my.sharepoint.com/:p:/g/personal/louis_forster_tum_de/IQBr7QnveYI-RZNYzINlelbMAXiYcbFoxcfF9xLivpCFtGo?e=I7GEuW
+https://tumde-my.sharepoint.com/:p:/g/personal/louis_forster_tum_de/IQC3OUMGp5U2QbnewA8ZQ1NPAV37wJM0MY9GHZgePpkr6JQ?e=pa3Nfv
