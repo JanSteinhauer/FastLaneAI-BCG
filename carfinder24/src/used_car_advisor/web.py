@@ -51,9 +51,27 @@ def _mint_token(room: str) -> str:
     )
 
 
+# The page is rebuilt while people are looking at it, and a cached index.html
+# pins the browser to an old bundle no matter how the asset URLs are versioned
+# — which looks exactly like "the new feature doesn't work". Nothing here is
+# worth caching: it is all served from localhost.
+NO_CACHE = {
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
+
+
+@web.middleware
+async def no_cache(request: web.Request, handler) -> web.StreamResponse:
+    response = await handler(request)
+    response.headers.update(NO_CACHE)
+    return response
+
+
 async def index(_: web.Request) -> web.Response:
     html = await asyncio.to_thread((PUBLIC_DIR / "index.html").read_bytes)
-    return web.Response(body=html, content_type="text/html")
+    return web.Response(body=html, content_type="text/html", headers=NO_CACHE)
 
 
 async def token(_: web.Request) -> web.Response:
@@ -86,7 +104,7 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8080)
     args = parser.parse_args()
 
-    app = web.Application()
+    app = web.Application(middlewares=[no_cache])
     app.router.add_get("/", index)
     app.router.add_get("/token", token)
     app.router.add_static("/public", PUBLIC_DIR)
