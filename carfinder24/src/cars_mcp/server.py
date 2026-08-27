@@ -177,6 +177,7 @@ def _card(row: dict[str, Any]) -> dict[str, Any]:
     """One listing, compact — the shape both the model and the UI consume."""
     return {
         "ref": _ref(row["id"]),
+        "make": row.get("make"),
         "title": _title(row),
         "year": _year(row),
         "price_eur": row["price"],
@@ -188,6 +189,8 @@ def _card(row: dict[str, Any]) -> dict[str, Any]:
         "body_type": row.get("body_type"),
         "city": row.get("city"),
         "seller": clean_text(row.get("seller_company_name"), 40),
+        "ratings_average": row.get("ratings_average"),
+        "ratings_count": row.get("ratings_count"),
     }
 
 
