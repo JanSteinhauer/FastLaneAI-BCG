@@ -137,6 +137,29 @@ function fmtEur(value, decimals = 0) {
 // The min/med/max market-position bar inside OfferCard's price panel — only
 // rendered when price_check found comparables (payload.comparison is null
 // otherwise, e.g. a rare make/model with too few matches to judge).
+// The make's logo from public/CarLogo/, named after the slugified make so the
+// path needs no lookup table. Nine makes have no file (Audi is the big one), and
+// a logo could 404 for any reason, so it degrades to the typographic monogram
+// rather than leaving a hole. Logos sit on a light chip: more than half of them
+// are black-on-transparent silhouettes and would be invisible on a dark card.
+function BrandMark({ make }) {
+  const [failed, setFailed] = useState(false);
+  const slug = (make || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const monogram = (make || "?").slice(0, 2).toUpperCase();
+
+  if (!slug || failed) return <span className="make-mark">{monogram}</span>;
+  return (
+    <span className="make-logo">
+      <img
+        src={`/public/CarLogo/${slug}.svg`}
+        alt=""
+        loading="lazy"
+        onError={() => setFailed(true)}
+      />
+    </span>
+  );
+}
+
 function PriceBar({ priceEur, comparison }) {
   const [min, max] = comparison.range_eur || [];
   if (min == null || max == null || max === min) return null;
@@ -181,15 +204,10 @@ function OfferCard({ payload }) {
 
   const shapeKey = BODY_TYPE_TO_SHAPE[(body_type || "").toLowerCase()] || "compact";
   const carColor = COLOR_HEX[(body_color || "").toLowerCase()] || null;
-  // No real logo assets ship in this repo (only the BCG X event logo) — a
-  // trademarked make logo would need licensing before it could go out with
-  // the app, so the badge is typographic, not an image.
-  const monogram = (make || "?").slice(0, 2).toUpperCase();
-
   return (
     <div className="offer-card">
       <div className="offer-head">
-        <span className="make-mark">{monogram}</span>
+        <BrandMark make={make} />
         <span className="make-name">{make}</span>
         {seller && <span className="make-sub">via {seller}</span>}
       </div>

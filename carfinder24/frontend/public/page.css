@@ -1163,3 +1163,30 @@ body::before {
   font-size: 0.68rem;
   color: var(--muted);
 }
+
+/* --- Brand logo on the offer card ----------------------------------------
+   Sits in the same 26px slot as .make-mark, so a logo and a monogram are
+   interchangeable. The light chip is not decoration: more than half of the
+   files in public/CarLogo/ are black-on-transparent silhouettes (BMW,
+   Mercedes-Benz, Volvo, Honda, VW, Kia, Aston Martin) and would be invisible
+   painted straight onto a dark card. See docs/BRAND_COLOURS.md. */
+
+.make-logo {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f4f6f7;
+  border: 1px solid var(--color-content-border);
+  overflow: hidden;
+}
+
+.make-logo img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  display: block;
+}
