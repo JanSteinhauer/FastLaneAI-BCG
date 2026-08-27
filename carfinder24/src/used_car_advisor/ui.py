@@ -199,6 +199,8 @@ def offer_payload(details: dict[str, Any], price_check: dict[str, Any], quote: d
         "ref": details.get("ref"),
         "make": details.get("make"),
         "title": details.get("title"),
+        "model": details.get("model"),
+        "seats": details.get("seats"),
         "body_type": details.get("body_type"),
         "body_color": details.get("body_color"),
         "year": details.get("year"),

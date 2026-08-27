@@ -1190,3 +1190,248 @@ body::before {
   object-fit: contain;
   display: block;
 }
+
+/* --- Offer card, wireframe layout ----------------------------------------
+   Header: boxed brand logo | vehicle name on a divider | price-comparison
+   gauge. Body: car silhouette on the left, price and specs on the right.
+   Markup in frontend/src/main.jsx (OfferCard). */
+
+.oc-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--color-content-border);
+}
+
+.oc-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oc-compare {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  cursor: help;
+}
+
+.oc-segs {
+  display: flex;
+  gap: 3px;
+}
+
+.oc-seg {
+  width: 13px;
+  height: 9px;
+  border-radius: 2px;
+  border: 1px solid var(--color-content-border);
+  background: transparent;
+}
+
+.oc-seg--on { border-color: transparent; }
+.oc-seg--on.oc-seg--below { background: var(--accent); }
+.oc-seg--on.oc-seg--even { background: #9fb0bd; }
+.oc-seg--on.oc-seg--above { background: #ffb4ab; }
+.oc-seg--on.oc-seg--none { background: var(--color-content-border); }
+
+.oc-compare-label {
+  font-size: 0.63rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.oc-body {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.85fr) minmax(0, 1.6fr);
+  gap: 16px;
+  padding: 16px;
+}
+
+.oc-visual {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 150px;
+  padding: 14px;
+  border: 1px solid var(--color-content-border);
+  border-radius: 9px;
+  background: var(--color-content-card);
+}
+
+.oc-visual svg { width: 100%; height: auto; }
+
+.oc-visual-tag {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  font-size: 0.63rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.oc-info {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  min-width: 0;
+}
+
+.oc-price {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 11px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.oc-price-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.oc-price-unit {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--muted);
+  margin-left: 5px;
+}
+
+.oc-price-note {
+  font-size: 0.73rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.oc-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0;
+}
+
+.oc-lines > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--color-content-border);
+}
+
+.oc-lines dt {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.oc-lines dd {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oc-specs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.oc-spec {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.oc-tick {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  margin-top: 2px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  position: relative;
+}
+
+.oc-tick::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 2px;
+  width: 3px;
+  height: 7px;
+  border: solid var(--accent);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+.oc-spec--empty .oc-tick {
+  border-color: var(--color-content-border);
+  background: transparent;
+}
+
+.oc-spec--empty .oc-tick::after { display: none; }
+
+.oc-spec-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.oc-spec-label {
+  font-size: 0.63rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.oc-spec-value {
+  font-size: 0.82rem;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oc-spec--empty .oc-spec-value { color: var(--muted); font-style: italic; }
+
+.oc-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 16px 14px;
+}
+
+@media (max-width: 560px) {
+  .oc-body { grid-template-columns: 1fr; }
+  .oc-visual { min-height: 110px; }
+  .oc-head { grid-template-columns: auto 1fr; }
+  .oc-compare { grid-column: 1 / -1; align-items: flex-start; }
+  .oc-name { text-align: left; }
+}

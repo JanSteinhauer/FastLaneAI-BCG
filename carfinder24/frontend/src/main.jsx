@@ -160,6 +160,46 @@ function BrandMark({ make }) {
   );
 }
 
+// Price comparison as a five-segment gauge: how this car's price sits inside
+// the min-max range of comparable listings. Fewer segments lit is cheaper, so
+// the bar reads left-to-right as "getting more expensive" without a legend.
+const COMPARE_SEGMENTS = 5;
+
+function PriceComparison({ priceEur, comparison }) {
+  let filled = 0;
+  let direction = "none";
+  let hint = "No comparable listings in the snapshot";
+
+  if (comparison) {
+    const [min, max] = comparison.range_eur || [];
+    direction = comparison.direction;
+    filled =
+      min != null && max != null && max > min
+        ? Math.min(
+            COMPARE_SEGMENTS,
+            Math.max(1, Math.ceil(((priceEur - min) / (max - min)) * COMPARE_SEGMENTS)),
+          )
+        : 3;
+    hint =
+      `${fmtEur(priceEur)} vs. a median of ${fmtEur(comparison.median_price_eur)} ` +
+      `across ${comparison.comparables} comparable listings`;
+  }
+
+  return (
+    <div className="oc-compare" title={hint}>
+      <div className="oc-segs" role="img" aria-label={hint}>
+        {Array.from({ length: COMPARE_SEGMENTS }, (_, i) => (
+          <span
+            key={i}
+            className={i < filled ? `oc-seg oc-seg--on oc-seg--${direction}` : "oc-seg"}
+          />
+        ))}
+      </div>
+      <span className="oc-compare-label">price comparison</span>
+    </div>
+  );
+}
+
 function PriceBar({ priceEur, comparison }) {
   const [min, max] = comparison.range_eur || [];
   if (min == null || max == null || max === min) return null;
@@ -195,8 +235,8 @@ function PriceBar({ priceEur, comparison }) {
 // the breakdown needs no component state of its own.
 function OfferCard({ payload }) {
   const {
-    make, title, body_type, body_color, year, mileage_km, power_hp, fuel, transmission,
-    drive_train, seller, city, ratings_average, ratings_count, had_accident,
+    make, title, model, body_type, body_color, year, mileage_km, seats, power_hp, fuel,
+    transmission, drive_train, seller, city, ratings_average, ratings_count, had_accident,
     full_service_history, previous_owners, consumption_l_100km, co2_g_km,
     price_eur, monthly_rate_eur, leasing_factor_pct, term_months, annual_km,
     down_payment_eur, breakdown = {}, total_cost_eur, cost_per_km_eur, comparison, footnote,
@@ -204,106 +244,88 @@ function OfferCard({ payload }) {
 
   const shapeKey = BODY_TYPE_TO_SHAPE[(body_type || "").toLowerCase()] || "compact";
   const carColor = COLOR_HEX[(body_color || "").toLowerCase()] || null;
+
+  // The four facts a buyer checks before anything else. A missing one still
+  // occupies its cell, unticked, rather than reflowing the grid — 42% of
+  // listings are missing at least one field, and a card that changes shape per
+  // car is harder to read across a shortlist.
+  const specs = [
+    ["Fuel", fuel],
+    ["City", city],
+    ["Year", year],
+    ["Seats", seats != null ? `${seats} seats` : null],
+  ];
+
   return (
     <div className="offer-card">
-      <div className="offer-head">
+      <header className="oc-head">
         <BrandMark make={make} />
-        <span className="make-name">{make}</span>
-        {seller && <span className="make-sub">via {seller}</span>}
-      </div>
+        <span className="oc-name" title={title}>{title}</span>
+        <PriceComparison priceEur={price_eur} comparison={comparison} />
+      </header>
 
-      <div className="offer-columns">
-        <div className="offer-left">
-          <div className="offer-stage">
-            <CarGlyph shape={shapeKey} carColor={carColor} />
-            <span className="stage-tag">{body_type || "—"}</span>
-          </div>
+      <div className="oc-body">
+        <div className="oc-visual">
+          <CarGlyph shape={shapeKey} carColor={carColor} />
+          <span className="oc-visual-tag">{body_type || "—"}</span>
+        </div>
 
-          <div className="offer-title-block">
-            <span className="offer-title" title={title}>{title}</span>
-            <span className="offer-spec">
-              {[
-                year,
-                mileage_km != null ? `${mileage_km.toLocaleString("de-DE")} km` : null,
-                power_hp ? `${power_hp} hp` : null,
-                fuel,
-                transmission,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
+        <div className="oc-info">
+          <div className="oc-price">
+            <span className="oc-price-value">
+              {fmtEur(monthly_rate_eur, 2)}<span className="oc-price-unit">/ month</span>
+            </span>
+            <span className="oc-price-note">
+              {fmtEur(price_eur)} list price
+              {leasing_factor_pct != null && ` · ${leasing_factor_pct}% per month`}
             </span>
           </div>
 
-          <div className="offer-seller-row">
-            {seller && <span className="offer-dealer">{seller}</span>}
-            {city && <span>{seller ? "· " : ""}{city}</span>}
-            {ratings_average != null && (
-              <span className="rating-chip">
-                <span className="star">★</span> {ratings_average} · {ratings_count} reviews
-              </span>
-            )}
-          </div>
-
-          <div className="fact-chips">
-            {had_accident === false && <span className="fact-chip good">No accident</span>}
-            {full_service_history && <span className="fact-chip good">Full service history</span>}
-            {previous_owners != null && (
-              <span className="fact-chip">
-                {previous_owners} previous owner{previous_owners === 1 ? "" : "s"}
-              </span>
-            )}
-            {drive_train && <span className="fact-chip">{drive_train}</span>}
-            {consumption_l_100km != null && co2_g_km != null ? (
-              <span className="fact-chip">{consumption_l_100km} l/100km · {co2_g_km} g CO₂/km</span>
-            ) : (
-              <span className="fact-chip na">Consumption not provided</span>
-            )}
-          </div>
-        </div>
-
-        <div className="offer-right">
-          <div className="price-panel">
-            <div className="price-head">
-              <span className="price-value">
-                {fmtEur(monthly_rate_eur, 2)}
-                <span className="unit">/ month</span>
-              </span>
-              <span className="price-vat">
-                incl. VAT · {term_months} months · {annual_km?.toLocaleString("de-DE")} km/year
-              </span>
+          <dl className="oc-lines">
+            <div>
+              <dt>Model</dt>
+              <dd>{model || title}</dd>
             </div>
-            {leasing_factor_pct != null && (
-              <span className="lease-factor">{leasing_factor_pct}% of list price / month</span>
-            )}
+            <div>
+              <dt>Mileage</dt>
+              <dd>{mileage_km != null ? `${mileage_km.toLocaleString("de-DE")} km` : "—"}</dd>
+            </div>
+          </dl>
 
-            {comparison && (
-              <div className="compare">
-                <span className={`verdict-pill verdict-pill--${comparison.direction}`}>
-                  {Math.abs(comparison.difference_pct)}%{" "}
-                  {comparison.direction === "below"
-                    ? "below market"
-                    : comparison.direction === "above"
-                      ? "above market"
-                      : "at market"}
+          <ul className="oc-specs">
+            {specs.map(([label, value]) => (
+              <li key={label} className={value ? "oc-spec" : "oc-spec oc-spec--empty"}>
+                <span className="oc-tick" aria-hidden="true" />
+                <span className="oc-spec-text">
+                  <span className="oc-spec-label">{label}</span>
+                  <span className="oc-spec-value">{value || "not stated"}</span>
                 </span>
-                <PriceBar priceEur={price_eur} comparison={comparison} />
-                <p className="compare-note">
-                  {fmtEur(price_eur)} vs. a median of {fmtEur(comparison.median_price_eur)} across{" "}
-                  {comparison.comparables} comparable listings.
-                </p>
-              </div>
-            )}
-
-            <div className="list-price-row">
-              <span className="k">List price</span>
-              <span className="v">{fmtEur(price_eur)}</span>
-            </div>
-            <div className="list-price-row list-price-row--plain">
-              <span className="k">Down payment</span>
-              <span className="v">{fmtEur(down_payment_eur)}</span>
-            </div>
-          </div>
+              </li>
+            ))}
+          </ul>
         </div>
+      </div>
+
+      <div className="oc-facts">
+        {had_accident === false && <span className="fact-chip good">No accident</span>}
+        {full_service_history && <span className="fact-chip good">Full service history</span>}
+        {previous_owners != null && (
+          <span className="fact-chip">
+            {previous_owners} previous owner{previous_owners === 1 ? "" : "s"}
+          </span>
+        )}
+        {power_hp && <span className="fact-chip">{power_hp} hp</span>}
+        {transmission && <span className="fact-chip">{transmission}</span>}
+        {drive_train && <span className="fact-chip">{drive_train}</span>}
+        {seller && <span className="fact-chip">{seller}</span>}
+        {ratings_average != null && (
+          <span className="fact-chip good">★ {ratings_average} · {ratings_count}</span>
+        )}
+        {consumption_l_100km != null && co2_g_km != null ? (
+          <span className="fact-chip">{consumption_l_100km} l/100km · {co2_g_km} g CO₂/km</span>
+        ) : (
+          <span className="fact-chip na">Consumption not provided</span>
+        )}
       </div>
 
       <details className="lease-details">

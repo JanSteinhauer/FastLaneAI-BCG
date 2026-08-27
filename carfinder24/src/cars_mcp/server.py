@@ -342,6 +342,7 @@ def car_details(ref: str) -> dict:
     ]
     return {
         **_card(row | {"monthly_rate": None}),
+        "model": clean_text(row.get("model"), 40),
         "body_color": row.get("body_color"),
         "seats": row.get("nr_seats"),
         "doors": row.get("nr_doors"),
