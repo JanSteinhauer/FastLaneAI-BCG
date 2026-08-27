@@ -1435,3 +1435,12 @@ body::before {
   .oc-compare { grid-column: 1 / -1; align-items: flex-start; }
   .oc-name { text-align: left; }
 }
+
+/* A car that cannot be leased on the terms asked for: the price tag drops the
+   accent, because there is no offer to highlight yet. */
+.oc-price--plain {
+  border-color: var(--color-content-border);
+  background: var(--color-content-card);
+}
+
+.oc-price--plain .oc-price-value { color: var(--text); }

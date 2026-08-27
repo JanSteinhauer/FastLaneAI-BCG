@@ -240,7 +240,12 @@ function OfferCard({ payload }) {
     full_service_history, previous_owners, consumption_l_100km, co2_g_km,
     price_eur, monthly_rate_eur, leasing_factor_pct, term_months, annual_km,
     down_payment_eur, breakdown = {}, total_cost_eur, cost_per_km_eur, comparison, footnote,
+    lease_note,
   } = payload;
+
+  // No rate means this car cannot be leased on the terms asked for. Lead with
+  // the list price and say why, rather than showing an empty price tag.
+  const hasRate = monthly_rate_eur != null;
 
   const shapeKey = BODY_TYPE_TO_SHAPE[(body_type || "").toLowerCase()] || "compact";
   const carColor = COLOR_HEX[(body_color || "").toLowerCase()] || null;
@@ -271,13 +276,20 @@ function OfferCard({ payload }) {
         </div>
 
         <div className="oc-info">
-          <div className="oc-price">
+          <div className={hasRate ? "oc-price" : "oc-price oc-price--plain"}>
             <span className="oc-price-value">
-              {fmtEur(monthly_rate_eur, 2)}<span className="oc-price-unit">/ month</span>
+              {hasRate ? fmtEur(monthly_rate_eur, 2) : fmtEur(price_eur)}
+              {hasRate && <span className="oc-price-unit">/ month</span>}
             </span>
             <span className="oc-price-note">
-              {fmtEur(price_eur)} list price
-              {leasing_factor_pct != null && ` · ${leasing_factor_pct}% per month`}
+              {hasRate ? (
+                <>
+                  {fmtEur(price_eur)} list price
+                  {leasing_factor_pct != null && ` · ${leasing_factor_pct}% per month`}
+                </>
+              ) : (
+                lease_note || "list price"
+              )}
             </span>
           </div>
 

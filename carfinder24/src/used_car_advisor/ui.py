@@ -65,7 +65,13 @@ def cars_payload(cars: list[dict[str, Any]], terms: dict[str, Any] | None = None
                     if car.get("monthly_rate_eur")
                     else _eur(car.get("price_eur"))
                 ),
-                "sub": _eur(car.get("price_eur")) + " listing price",
+                # Only a subtitle when the headline is the monthly rate —
+                # otherwise the card printed the list price twice.
+                "sub": (
+                    _eur(car.get("price_eur")) + " listing price"
+                    if car.get("monthly_rate_eur")
+                    else None
+                ),
                 "year": car.get("year"),
                 "mileage_km": car.get("mileage_km"),
                 "fuel": car.get("fuel"),
@@ -168,6 +174,7 @@ def offer_payload(details: dict[str, Any], price_check: dict[str, Any], quote: d
     OfferCard needs in one payload, so the frontend never has to reconcile
     three separate tool responses itself.
     """
+    declined = quote.get("declined")
     term_months = quote.get("term_months")
     annual_km = quote.get("annual_km")
     monthly_rate = quote.get("monthly_rate_eur")
@@ -228,5 +235,8 @@ def offer_payload(details: dict[str, Any], price_check: dict[str, Any], quote: d
         "total_cost_eur": total_cost,
         "cost_per_km_eur": round(cost_per_km, 2) if cost_per_km is not None else None,
         "comparison": comparison,
+        # Set when the car cannot be leased on the terms asked for. The card
+        # then leads with the list price instead of a rate it does not have.
+        "lease_note": declined or None,
         "footnote": "Indicative offer · incl. VAT · not a credit agreement · final terms confirmed by the dealer.",
     }

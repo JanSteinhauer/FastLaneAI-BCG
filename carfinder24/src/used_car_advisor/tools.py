@@ -139,11 +139,62 @@ async def find_cars(
     await ui.push(context, ui.filters_payload(filters))
     if isinstance(result, str):
         return result
-    if result.get("cars"):
-        await ui.push(context, ui.cars_payload(result["cars"], result.get("terms")))
+    cars = result.get("cars") or []
+    if len(cars) == 1:
+        # One result is not a shortlist. Show the full card.
+        await _push_one_car(
+            context, cars[0]["ref"],
+            _nearest(int(term_months), TERMS), _nearest(int(annual_km), KM_TIERS),
+            int(down_payment),
+        )
+    elif cars:
+        await ui.push(context, ui.cars_payload(cars, result.get("terms")))
     else:
         await ui.push(context, ui.text_payload("No matching cars — let's widen the search."))
     return result
+
+
+async def _push_one_car(
+    context: RunContext_T,
+    ref: str,
+    term_months: int = 36,
+    annual_km: int = 15000,
+    down_payment: int = 0,
+) -> Any:
+    """Draw the full offer card for a single car.
+
+    Whenever exactly one car is on screen the customer has stopped comparing
+    and started deciding, so the shortlist tile is the wrong shape: they want
+    the logo, the market comparison, the specs and the rate. This fetches the
+    three things that card needs and pushes them as one payload.
+
+    A car that cannot be leased on these terms still gets the card — with the
+    list price leading and the reason attached — rather than falling back to a
+    tile that would print the price twice.
+    """
+    details = await _call(context, "car_details", {"ref": ref})
+    if isinstance(details, str):
+        return details
+
+    price_check = await _call(context, "price_check", {"ref": ref})
+    if isinstance(price_check, str):
+        price_check = {"comparables": 0}
+
+    quote = await _call(
+        context,
+        "leasing_quote",
+        {
+            "ref": ref,
+            "term_months": _nearest(int(term_months), TERMS),
+            "annual_km": _nearest(int(annual_km), KM_TIERS),
+            "down_payment": int(down_payment),
+        },
+    )
+    if isinstance(quote, str):
+        quote = {}
+
+    await ui.push(context, ui.offer_payload(details, price_check, quote))
+    return details
 
 
 @function_tool
@@ -154,11 +205,7 @@ async def show_car(context: RunContext_T, ref: str) -> Any:
     owners, consumption. Summarise in one or two sentences; the details are on
     their screen.
     """
-    result = await _call(context, "car_details", {"ref": ref})
-    if isinstance(result, str):
-        return result
-    await ui.push(context, ui.cars_payload([{**result, "monthly_rate_eur": None}]))
-    return result
+    return await _push_one_car(context, ref)
 
 
 @function_tool
