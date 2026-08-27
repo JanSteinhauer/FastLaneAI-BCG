@@ -347,53 +347,63 @@ function OfferCard({ payload }) {
         )}
       </div>
 
-      <details className="lease-details">
-        <summary>
-          Leasing details <span className="chevron">▾</span>
-        </summary>
-        <div className="lease-groups">
-          <div>
-            <div className="lease-group-label">Monthly</div>
-            <div className="lease-rows">
-              <div className="lease-row">
-                <span className="k">Depreciation</span>
-                <span className="v">{fmtEur(breakdown.depreciation_eur, 2)}</span>
+      {hasRate ? (
+        <section className="lease-block">
+          <h3 className="lease-head">
+            <span>Leasing agreement</span>
+            <span className="lease-head-terms">
+              {term_months} months · {annual_km?.toLocaleString("en-GB").replace(/,/g, "\u202f")} km/year
+            </span>
+          </h3>
+
+          <div className="lease-grid">
+            <div className="lease-col">
+              <div className="lease-group-label">Every month</div>
+              <div className="lease-rows">
+                <div className="lease-row">
+                  <span className="k">Depreciation</span>
+                  <span className="v">{fmtEur(breakdown.depreciation_eur, 2)}</span>
+                </div>
+                <div className="lease-row">
+                  <span className="k">Finance charge ({breakdown.apr_pct}% p.a.)</span>
+                  <span className="v">{fmtEur(breakdown.finance_eur, 2)}</span>
+                </div>
+                <div className="lease-row lease-row--sum">
+                  <span className="k">Leasing rate</span>
+                  <span className="v">{fmtEur(monthly_rate_eur, 2)}</span>
+                </div>
               </div>
-              <div className="lease-row">
-                <span className="k">Finance charge ({breakdown.apr_pct}% p.a.)</span>
-                <span className="v">{fmtEur(breakdown.finance_eur, 2)}</span>
-              </div>
-              <div className="lease-row">
-                <span className="k">Leasing rate</span>
-                <span className="v">{fmtEur(monthly_rate_eur, 2)}</span>
+            </div>
+
+            <div className="lease-col">
+              <div className="lease-group-label">One-time &amp; end of term</div>
+              <div className="lease-rows">
+                <div className="lease-row">
+                  <span className="k">Down payment</span>
+                  <span className="v">{fmtEur(down_payment_eur)}</span>
+                </div>
+                <div className="lease-row">
+                  <span className="k">Residual value at term end</span>
+                  <span className="v">{fmtEur(breakdown.residual_value_eur)}</span>
+                </div>
+                {cost_per_km_eur != null && (
+                  <div className="lease-row">
+                    <span className="k">Cost per km</span>
+                    <span className="v">{fmtEur(cost_per_km_eur, 2)}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-          <div>
-            <div className="lease-group-label">One-time</div>
-            <div className="lease-rows">
-              <div className="lease-row">
-                <span className="k">Down payment</span>
-                <span className="v">{fmtEur(down_payment_eur)}</span>
-              </div>
-              <div className="lease-row">
-                <span className="k">Residual value at term end</span>
-                <span className="v">{fmtEur(breakdown.residual_value_eur)}</span>
-              </div>
-            </div>
-          </div>
+
           <div className="total-box">
-            <span className="k">Total cost · {term_months} months</span>
+            <span className="k">Total over {term_months} months</span>
             <span className="v">{fmtEur(total_cost_eur, 2)}</span>
           </div>
-          {cost_per_km_eur != null && (
-            <div className="per-km-row">
-              <span>Cost per km</span>
-              <span className="v">{fmtEur(cost_per_km_eur, 2)}/km</span>
-            </div>
-          )}
-        </div>
-      </details>
+        </section>
+      ) : (
+        lease_note && <p className="lease-blocked">{lease_note}</p>
+      )}
 
       {footnote && <p className="offer-footnote">{footnote}</p>}
     </div>

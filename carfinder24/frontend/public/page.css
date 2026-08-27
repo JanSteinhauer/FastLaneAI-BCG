@@ -1444,3 +1444,117 @@ body::before {
 }
 
 .oc-price--plain .oc-price-value { color: var(--text); }
+
+/* --- Leasing agreement, inline on the offer card -------------------------
+   The rate and the car are one decision, so the breakdown is part of the page
+   rather than an accordion the customer has to think to open. */
+
+.lease-block {
+  border-top: 1px solid var(--color-content-border);
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lease-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.lease-head-terms {
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.lease-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px 22px;
+}
+
+.lease-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lease-group-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.lease-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.lease-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-content-border) 55%, transparent);
+}
+
+.lease-row .v {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.lease-row--sum {
+  border-bottom: 0;
+  padding-top: 6px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.lease-row--sum .v { color: var(--accent); }
+
+.total-box {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 13px;
+  border-radius: 8px;
+  background: var(--color-content-card);
+  border: 1px solid var(--color-content-border);
+  font-size: 0.83rem;
+}
+
+.total-box .k { color: var(--muted); }
+
+.total-box .v {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.lease-blocked {
+  margin: 0;
+  padding: 13px 16px 15px;
+  border-top: 1px solid var(--color-content-border);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
