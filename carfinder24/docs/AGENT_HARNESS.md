@@ -75,8 +75,27 @@ the advisor's voice; the frontend already renders any participant whose identity
 is `tavus-avatar-<persona>`. With the avatar on, the agent stops publishing its
 own audio (`RoomOutputOptions(audio_enabled=False)`) — the avatar worker
 publishes the lip-synced track, and publishing both would double the voice.
-Override the replica with `TAVUS_REPLICA_ID`; the default is the stock replica
-"Charlie". A failure *at startup* can never take the voice down: it is caught,
+Override the replica with `TAVUS_REPLICA_ID`. The default is **Steve -
+Professional** (`rdd4c86e5e1a`) — suit, tie, mid-forties, the dealership look —
+picked from the 90 stock replicas on the account. Shortlist, all phoenix-4:
+
+| Replica | ID | Looks like |
+|---|---|---|
+| **Steve - Professional** | `rdd4c86e5e1a` | Dark suit and tie, grey at the temples — the car salesman |
+| Raj - Business | `re6220ec0195` | Business attire, warmer read |
+| Rose - Business | `r6c7a6cb6d9b` | Business attire |
+| Mary - Business | `r55e6793f10f` | Business attire |
+| Anna - Professional | `rf4e9d9790f0` | Business attire |
+| James - Office | `rfb0463909e3` | Polo and cardigan — approachable, not corporate |
+| Victor - Office | `re3fd4adeafd` | Sweatshirt, older, friendly |
+| Daniel - Office | `r72f7f7f7c8b` | Late twenties, casual shirt |
+
+List them all with
+`curl -H "x-api-key: $TAVUS_API_KEY" "https://tavusapi.com/v2/replicas?replica_type=system&limit=100"`.
+
+**Match the voice to the face.** The persona's voice is `cedar` (warm,
+masculine); a female replica needs a matching gpt-realtime voice — `marin`,
+`sage`, `coral` or `shimmer` — changed in the `PERSONAS` registry in `agent.py`. A failure *at startup* can never take the voice down: it is caught,
 logged, and the session continues without a face.
 
 **Verified**: with `USE_AVATAR=1` the Tavus participant joins as

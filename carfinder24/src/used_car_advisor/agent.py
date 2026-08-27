@@ -187,7 +187,9 @@ async def _start_avatar(session: AgentSession, ctx: JobContext, persona_key: str
     """
     from livekit.plugins import tavus  # imported lazily: optional dependency path
 
-    replica_id = os.getenv("TAVUS_REPLICA_ID") or "rf4703150052"  # stock replica "Charlie"
+    # "Steve - Professional" — suit and tie, mid-forties: the dealership look.
+    # Swap with TAVUS_REPLICA_ID; see docs/AGENT_HARNESS.md for the shortlist.
+    replica_id = os.getenv("TAVUS_REPLICA_ID") or "rdd4c86e5e1a"
     persona_id = os.getenv("TAVUS_PERSONA_ID") or None
     kwargs: dict[str, object] = {
         "replica_id": replica_id,
