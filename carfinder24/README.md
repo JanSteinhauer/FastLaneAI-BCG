@@ -34,6 +34,9 @@ Read `docs/` before changing anything:
 | [docs/AGENT_HARNESS.md](docs/AGENT_HARNESS.md) | How to add a tool or a persona, the restart rules, failure behaviour, the Tavus avatar |
 | [docs/SECURITY.md](docs/SECURITY.md) | Threat model: conversation injection, injection through listing data, outbound abuse, false statements |
 | [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) | The rehearsed live demo, line by line |
+| [docs/PITCH.md](docs/PITCH.md) | The five-minute pitch: beats, timings, the words |
+| [docs/ROLES.md](docs/ROLES.md) | Who does what now that the code is frozen |
+| [docs/pitch-deck.html](docs/pitch-deck.html) | The deck itself — arrow keys, `N` for speaker notes, `T` for the rehearsal timer |
 
 `uv run pytest tests -q` — 29 tests, including the parity check that stops the
 SQL and Python leasing models from ever disagreeing.
