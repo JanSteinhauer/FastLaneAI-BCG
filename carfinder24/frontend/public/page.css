@@ -1,0 +1,580 @@
+/* Compact BCG X treatment for the recruiting-event voice demo. Tokens mirror
+   the reference theme in executive-decision-agent/frontend/libs/theming. */
+
+:root {
+  --color-brand-primary: #00e0b5;
+  --color-brand-on-primary: #0a1f1b;
+  --color-brand-secondary: #00a887;
+  --color-brand-accent: #4928ff;
+  --color-content: #232326;
+  --color-content-foreground: #f4f4f5;
+  --color-content-muted: #a5a5a9;
+  --color-content-card: #2d2d31;
+  --color-content-card-soft: #37373d;
+  --color-content-border: rgb(255 255 255 / 0.1);
+  --bg-image-logo: url("/public/assets/themes/bcgx/logo-on-dark.png");
+  --font-sans: Inter, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --bg: var(--color-content);
+  --card: var(--color-content-card);
+  --text: var(--color-content-foreground);
+  --muted: var(--color-content-muted);
+  --accent: var(--color-brand-primary);
+  --accent-hover: var(--color-brand-secondary);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--bg);
+}
+
+body {
+  position: relative;
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-x: hidden;
+  background:
+    radial-gradient(circle at 84% 18%, rgb(73 40 255 / 0.18), transparent 31rem),
+    radial-gradient(circle at 12% 82%, rgb(0 224 181 / 0.1), transparent 28rem),
+    var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.2;
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.045) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: linear-gradient(to bottom, transparent, black 20%, black 80%, transparent);
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  padding: 32px;
+}
+
+.widget {
+  position: relative;
+  width: 100%;
+  max-width: 680px;
+  overflow: hidden;
+  padding: 0 40px 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  background:
+    linear-gradient(145deg, rgb(255 255 255 / 0.018), transparent 45%),
+    var(--card);
+  border: 1px solid var(--color-content-border);
+  border-radius: 12px;
+  box-shadow: 0 28px 80px rgb(0 0 0 / 0.38);
+}
+
+.widget::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent) 0 72%, var(--color-brand-accent) 72% 100%);
+}
+
+.brand-header {
+  width: 100%;
+  height: 84px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid var(--color-content-border);
+}
+
+.brand-logo {
+  display: block;
+  width: 112px;
+  height: 47px;
+  flex: none;
+  background-image: var(--bg-image-logo);
+  background-repeat: no-repeat;
+  background-position: left center;
+  background-size: contain;
+}
+
+.demo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  color: var(--muted);
+  background: rgb(255 255 255 / 0.035);
+  border: 1px solid var(--color-content-border);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.demo-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-brand-accent);
+  box-shadow: 0 0 0 3px rgb(73 40 255 / 0.16);
+}
+
+.demo-dot--live {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgb(0 224 181 / 0.14);
+  animation: live-pulse 1.8s ease-out infinite;
+}
+
+.hero,
+.session-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.hero {
+  padding-top: 34px;
+  gap: 14px;
+}
+
+.session-intro {
+  padding-top: 8px;
+  gap: 8px;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.widget h1 {
+  margin: 0;
+  font-size: clamp(2.15rem, 5vw, 3rem);
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 1.02;
+}
+
+.session-intro h1 {
+  font-size: 1.55rem;
+  letter-spacing: -0.025em;
+}
+
+.tagline {
+  max-width: 490px;
+  margin: 0;
+  color: var(--muted);
+  text-align: center;
+  font-size: 1rem;
+  line-height: 1.58;
+}
+
+.session-intro .tagline {
+  font-size: 0.9rem;
+}
+
+.start {
+  min-width: 258px;
+  min-height: 56px;
+  margin-top: 8px;
+  padding: 13px 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  color: var(--color-brand-on-primary);
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.96rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 12px 28px rgb(0 224 181 / 0.14);
+  transition: transform 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.start:hover {
+  transform: translateY(-2px);
+  background: #00ffcc;
+  box-shadow: 0 16px 34px rgb(0 224 181 / 0.22);
+}
+
+.start:active {
+  transform: translateY(0);
+  background: var(--accent-hover);
+}
+
+.start-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.start-icon svg {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.start-arrow {
+  margin-left: auto;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.hint {
+  width: 100%;
+  margin: 18px 0 0;
+  padding-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: color-mix(in srgb, var(--muted) 72%, transparent);
+  border-top: 1px solid var(--color-content-border);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.hint > span {
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hint code {
+  padding: 4px 7px;
+  color: var(--muted);
+  background: rgb(255 255 255 / 0.055);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+}
+
+.error {
+  margin: 0;
+  padding: 10px 12px;
+  color: #ffb4ab;
+  background: rgb(255 180 171 / 0.08);
+  border: 1px solid rgb(255 180 171 / 0.16);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.aura-stage {
+  width: 100%;
+  min-height: 276px;
+  display: grid;
+  place-items: center;
+  margin: 2px 0 0;
+}
+
+.agent-audio-visualizer-aura {
+  flex: none;
+  width: var(--aura-size, 224px);
+  height: var(--aura-size, 224px);
+  margin: 0;
+  aspect-ratio: 1;
+  filter: drop-shadow(0 0 30px rgb(0 224 181 / 0.16));
+}
+
+.agent-audio-visualizer-aura canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.aura--icon { --aura-size: 24px; }
+.aura--sm { --aura-size: 56px; }
+.aura--md { --aura-size: 112px; }
+.aura--lg { --aura-size: 224px; }
+.aura--xl { --aura-size: min(448px, 70vw); }
+
+.aura-fallback {
+  width: 72%;
+  height: 72%;
+  margin: 14%;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 18px var(--accent), inset 0 0 18px var(--accent);
+  opacity: 0.75;
+  animation: aura-pulse 1.6s ease-in-out infinite alternate;
+}
+
+/* Shown in the aura's place while the agent connects — and in avatar chats
+   while the avatar joins (the worker holds the session back until the video
+   is published, so this covers the whole ~5–15 s Tavus wait). */
+.stage-loader {
+  display: grid;
+  place-items: center;
+}
+
+.stage-loader-ring {
+  width: 56px;
+  height: 56px;
+  border: 3px solid rgb(255 255 255 / 0.12);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: loader-spin 900ms linear infinite;
+}
+
+@keyframes loader-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+/* Tavus avatar video — takes the aura's place when the agent brings video
+   (web client started with --avatar). --persona-color is set inline from the
+   same agent_color attribute that tints the aura, so the glow crossfades on
+   persona handoff just like the aura does. */
+.aura-stage .avatar-video {
+  height: 276px;
+  width: auto;
+  max-width: 100%;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--color-content-border);
+  box-shadow: 0 0 34px
+    color-mix(in srgb, var(--persona-color, var(--accent)) 30%, transparent);
+  transition: box-shadow 900ms ease;
+}
+
+/* Per-persona avatars: inactive faces stay mounted (their streams keep
+   flowing) but hidden, so a persona handoff switches faces instantly. */
+.aura-stage .avatar-video--hidden {
+  display: none;
+}
+
+.status {
+  margin: 0;
+  padding: 7px 11px;
+  color: var(--text);
+  background: var(--color-content-card-soft);
+  border: 1px solid var(--color-content-border);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: capitalize;
+}
+
+.status::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgb(0 224 181 / 0.12);
+}
+
+.controls {
+  display: flex;
+  gap: 10px;
+}
+
+.controls button {
+  min-height: 42px;
+  padding: 9px 17px;
+  color: var(--text);
+  background: rgb(255 255 255 / 0.055);
+  border: 1px solid var(--color-content-border);
+  border-radius: 7px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.controls button:hover {
+  background: var(--color-content-card-soft);
+  border-color: rgb(0 224 181 / 0.32);
+}
+
+.controls .lk-button[data-lk-enabled="false"] {
+  color: #ffb4ab;
+}
+
+.lk-start-audio-button {
+  border-radius: 7px;
+}
+
+.panel {
+  width: 100%;
+}
+
+.panel .bubble {
+  padding: 14px 16px;
+  color: var(--text);
+  background: var(--color-content-card-soft);
+  border: 1px solid var(--color-content-border);
+  border-radius: 8px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.cars {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.car-card {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-content-card-soft);
+  border: 1px solid var(--color-content-border);
+  border-radius: 8px;
+}
+
+.car-card img {
+  width: 100%;
+  height: 106px;
+  display: block;
+  object-fit: cover;
+}
+
+.car-card .body {
+  padding: 11px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.car-card .title {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.car-card .price {
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.car-card .meta {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+:focus-visible:not([contenteditable="true"]) {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@keyframes live-pulse {
+  0% { box-shadow: 0 0 0 0 rgb(0 224 181 / 0.35); }
+  70%, 100% { box-shadow: 0 0 0 7px transparent; }
+}
+
+@keyframes aura-pulse {
+  to { transform: scale(1.08); opacity: 1; }
+}
+
+@media (max-width: 600px) {
+  #root {
+    padding: 14px;
+  }
+
+  .widget {
+    padding: 0 20px 22px;
+    border-radius: 9px;
+  }
+
+  .brand-header {
+    height: 72px;
+  }
+
+  .brand-logo {
+    width: 92px;
+    height: 39px;
+  }
+
+  .demo-badge {
+    padding: 6px 8px;
+    font-size: 0.64rem;
+  }
+
+  .hero {
+    padding-top: 24px;
+  }
+
+  .widget h1 {
+    font-size: 2.15rem;
+  }
+
+  .session-intro h1 {
+    font-size: 1.4rem;
+  }
+
+  .aura-stage {
+    min-height: 248px;
+  }
+
+  .aura-stage .avatar-video {
+    height: 248px;
+  }
+
+  .start {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .hint {
+    flex-direction: column;
+    gap: 7px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-dot--live,
+  .aura-fallback {
+    animation: none;
+  }
+
+  /* Keep the loader (it's essential feedback), just slow it right down. */
+  .stage-loader-ring {
+    animation-duration: 2.4s;
+  }
+
+  .start {
+    transition: none;
+  }
+}

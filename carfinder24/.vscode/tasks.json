@@ -1,0 +1,75 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start CarFinder24 stack",
+      "dependsOn": ["MCP tool server", "Agent worker", "Web client"],
+      "dependsOrder": "sequence",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "MCP tool server",
+      "type": "shell",
+      "command": "uv run used-car-advisor-mcp",
+      "isBackground": true,
+      "presentation": {
+        "panel": "dedicated",
+        "group": "carfinder24-stack",
+        "reveal": "always"
+      },
+      "problemMatcher": {
+        "owner": "carfinder24",
+        "pattern": [{ "regexp": "^$", "file": 1, "line": 1, "message": 1 }],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".",
+          "endsPattern": "Uvicorn running on|Application startup complete"
+        }
+      }
+    },
+    {
+      "label": "Agent worker",
+      "type": "shell",
+      "command": "uv run used-car-advisor dev",
+      "isBackground": true,
+      "presentation": {
+        "panel": "dedicated",
+        "group": "carfinder24-stack",
+        "reveal": "always"
+      },
+      "problemMatcher": {
+        "owner": "carfinder24",
+        "pattern": [{ "regexp": "^$", "file": 1, "line": 1, "message": 1 }],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".",
+          "endsPattern": "registered worker"
+        }
+      }
+    },
+    {
+      "label": "Web client",
+      "type": "shell",
+      "command": "uv run used-car-advisor-web",
+      "isBackground": true,
+      "presentation": {
+        "panel": "dedicated",
+        "group": "carfinder24-stack",
+        "reveal": "always"
+      },
+      "problemMatcher": {
+        "owner": "carfinder24",
+        "pattern": [{ "regexp": "^$", "file": 1, "line": 1, "message": 1 }],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".",
+          "endsPattern": "Running on http|Open http://localhost"
+        }
+      }
+    }
+  ]
+}
